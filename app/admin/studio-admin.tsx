@@ -3,12 +3,14 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { editorName, type GreetingMessage, type TrackItem } from '../chat-types';
 import { GreetingProvider, useGreetings } from '../cinematic/greetings';
+import { Icon } from '../cinematic/icons';
 import { WallChat } from '../cinematic/wall-chat';
 import type { Report } from '../server/reports';
 import {
   displayBlocks, blockLabels, blockPresentation, phaseLabels, phases, studioSchema, visualLabels,
   type Block, type Contacts, type Edition, type Phase, type Studio, type StudioDocument,
 } from '../studio-config';
+import { SupportInbox } from './support-inbox';
 import '../cinematic/chat.css';
 
 type SVGName = 'settings' | 'chat' | 'stats' | 'meter' | 'external' | 'arrow' | 'download' | 'check' | 'radio' | 'video' | 'music' | 'eye' | 'clock' | 'phone' | 'logout';
@@ -39,6 +41,7 @@ const tabs = [
   { id: 'settings', text: 'Настройки сайта', icon: 'settings' },
   { id: 'contacts', text: 'Контакты', icon: 'phone' },
   { id: 'chat', text: 'Чат и заявки', icon: 'chat' },
+  { id: 'support', text: 'Техподдержка', icon: 'support' },
   { id: 'stats', text: 'Статистика', icon: 'stats' },
   { id: 'metrics', text: 'Яндекс.Метрика', icon: 'meter' },
 ] as const;
@@ -567,7 +570,8 @@ export function StudioAdmin({ initial }: { initial: StudioDocument }) {
       </a>
       <nav className="studio-nav" aria-label="Разделы редакции">
         {tabs.map(item => <button key={item.id} type="button" onClick={() => go(item.id)} aria-current={item.id === tab ? 'page' : undefined}>
-          <Glyph name={item.icon} /><span>{item.text}</span>{item.id === tab && <Glyph name="arrow" size={15} />}
+          {item.icon === 'support' ? <Icon name="support" size={19} /> : <Glyph name={item.icon} />}
+          <span>{item.text}</span>{item.id === tab && <Glyph name="arrow" size={15} />}
         </button>)}
       </nav>
       <div className="studio-side-foot"><span className="studio-avatar" aria-hidden="true">✓</span><span>{editorName}</span></div>
@@ -599,6 +603,7 @@ export function StudioAdmin({ initial }: { initial: StudioDocument }) {
           setDraft(previous => ({ ...previous, contacts: { ...previous.contacts, ...patch } })); setNotice('');
         }} />}
         {tab === 'chat' && <Inbox data={data} error={reportError} reload={reload} />}
+        {tab === 'support' && <SupportInbox />}
         {tab === 'stats' && <Stats data={data} error={reportError} reload={reload} />}
         {tab === 'metrics' && <Metrics value={draft.metrika} change={metrika => { setDraft(previous => ({ ...previous, metrika })); setNotice(''); }} />}
       </main>

@@ -1,4 +1,4 @@
-import { type AnySQLiteColumn, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { type AnySQLiteColumn, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const chatMessage = sqliteTable('chat_message', {
   id: text('id').primaryKey(),
@@ -59,4 +59,34 @@ export const trackRequest = sqliteTable('track_request', {
 }, table => [
   index('track_created').on(table.createdAt),
   index('track_author_time').on(table.authorKey, table.createdAt),
+]);
+
+export const supportTicket = sqliteTable('support_ticket', {
+  number: integer('number').primaryKey({ autoIncrement: true }),
+  id: text('id').notNull().unique(),
+  email: text('email').notNull(),
+  description: text('description').notNull(),
+  status: text('status', { enum: ['new', 'in_progress', 'resolved'] }).notNull().default('new'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, table => [
+  index('support_ticket_status_number').on(table.status, table.number),
+  index('support_ticket_created_at').on(table.createdAt),
+  index('support_ticket_email_time').on(table.email, table.createdAt),
+]);
+
+export const supportSettings = sqliteTable('support_settings', {
+  id: integer('id').primaryKey(),
+  email: text('email').notNull(),
+});
+
+export const supportDelivery = sqliteTable('support_delivery', {
+  ticketId: text('ticket_id').notNull().references(() => supportTicket.id, { onDelete: 'cascade' }),
+  channel: text('channel', { enum: ['email', 'helpdesk'] }).notNull(),
+  state: text('state', { enum: ['pending', 'sending', 'sent', 'failed'] }).notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+  error: text('error'),
+}, table => [
+  uniqueIndex('support_delivery_ticket_channel').on(table.ticketId, table.channel),
 ]);

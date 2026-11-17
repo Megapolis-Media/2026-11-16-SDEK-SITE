@@ -1,7 +1,7 @@
 'use client';
 
 import {
-  type ChangeEvent, type FormEvent, type MouseEvent, type RefObject,
+  type ChangeEvent, type FormEvent, type MouseEvent, type ReactNode, type RefObject,
   useCallback, useEffect, useId, useRef, useState,
 } from 'react';
 import {
@@ -355,7 +355,7 @@ function MessageList({ editorial, admin, circuit }: ThreadProps) {
   </div>;
 }
 
-export function WallChat({ editorial = false, admin = false, circuit = false, title }: ThreadProps & { title?: string }) {
+export function WallChat({ editorial = false, admin = false, circuit = false, title, footer }: ThreadProps & { title?: string; footer?: ReactNode }) {
   const { open, reopen } = useGreetings();
   const panel = useRef<HTMLDivElement>(null);
   const air = useOptionalOnAir();
@@ -371,6 +371,7 @@ export function WallChat({ editorial = false, admin = false, circuit = false, ti
     <Composer editorial={editorial} admin={admin} circuit={circuit} panel={circuit || admin ? undefined : panel} />
     {circuit && <h3 className="wall-feed-title">Чат эфира</h3>}
     <MessageList editorial={editorial} admin={admin} circuit={circuit} />
+    {footer && <div className="circuit-panel-footer">{footer}</div>}
   </div>;
   if (admin) return chat;
   if (circuit) return <div className="circuit-layout wrap">

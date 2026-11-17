@@ -29,6 +29,13 @@
       "when": 1794855926935,
       "tag": "0003_studio_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794911512472,
+      "tag": "0004_support_tickets",
+      "breakpoints": true
     }
   ]
 }
