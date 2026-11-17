@@ -30,3 +30,5 @@ npm run build
 ```
 
 Правила веток и pull request описаны в [CONTRIBUTING.md](../CONTRIBUTING.md) и [AGENTS.md](../AGENTS.md).
+
+Production-сборка для выделенного сервера и автодеплой из `master`: [DEPLOYMENT.md](DEPLOYMENT.md).
