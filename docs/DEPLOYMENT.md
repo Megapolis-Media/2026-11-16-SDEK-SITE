@@ -4,9 +4,9 @@ Production: `cdek-fm.ru`, сервер `194.58.103.93`, Ubuntu 24.04, Docker Com
 
 ## Как выпускается сайт
 
-1. Изменения разработчика поступают в `dev` через PR, затем владелец сливает `dev → master` через merge commit.
+1. `megapolisbroadcasting` и `Knyazzer` после принятия Write-доступа могут отправлять изменения напрямую в `dev`; остальные участники присылают PR. Владелец `Megapolis-Media` сливает `dev → master` через merge commit.
 2. `.github/workflows/deploy.yml` запускается при push в `master`. Ручной запуск разрешён только для `master`.
-3. GitHub Actions собирает образ `cdek-fm:<полный SHA коммита>`. При сборке выполняются тесты серверного хранилища, TypeScript и production-сборка.
+3. Job ожидает подтверждения аккаунтом `Megapolis-Media` в environment `production` (Review deployments → Approve and deploy). Без подтверждения сборка и выкладка не стартуют; обход администраторами выключен. После подтверждения GitHub Actions собирает образ `cdek-fm:<полный SHA коммита>` с тестами серверного хранилища, TypeScript и production-сборкой.
 4. Образ передаётся через SSH пользователю `cdek-deploy`. Его ключ разрешает только запуск root-owned скрипта `/usr/local/sbin/cdek-fm-deploy`; интерактивный shell, SFTP и forwarding для этого ключа отключены.
 5. Скрипт сериализует выкладки через `flock`, останавливает предыдущий контейнер, делает резервную копию данных, применяет миграции и ждёт успешного healthcheck. На время смены версии возможен короткий перерыв.
 
