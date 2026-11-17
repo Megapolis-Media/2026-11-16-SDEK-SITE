@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { maxImageBytes, messageLimit, uuid } from '../../chat-types';
-import { chatModerationRevision, cleanText, hash, inspectImage, listMessages, messageById, presentMessage, readBytes, visitor } from '../../server/chat';
+import { chatModerationRevision, cleanText, hash, inspectImage, listMessages, mediaType, messageById, presentMessage, readBytes, visitor } from '../../server/chat';
 import { json, publicEdition, readStudio, sameOrigin } from '../../server/studio';
 import { withApiErrors } from '../../server/api-errors';
 
@@ -35,8 +35,8 @@ async function postChat(request: Request) {
   if (!db) return json({ error: 'Чат временно недоступен' }, 503);
   if (!sameOrigin(request)) return json({}, 403);
   const type = request.headers.get('content-type') ?? '';
-  const multipart = type.startsWith('multipart/form-data;');
-  if (!multipart && !type.startsWith('application/json')) return json({}, 415);
+  const multipart = mediaType(request) === 'multipart/form-data';
+  if (!multipart && mediaType(request) !== 'application/json') return json({}, 415);
   let data: Record<string, unknown>;
   let file: File | null = null;
   try {
@@ -49,7 +49,7 @@ async function postChat(request: Request) {
       data = JSON.parse(new TextDecoder().decode(bytes));
     }
   } catch (error) {
-    return error instanceof RangeError ? json({ error: 'Картинка слишком большая' }, 413) : json({}, 400);
+    return error instanceof RangeError ? json({ error: multipart ? 'Картинка слишком большая' : 'Сообщение слишком длинное' }, 413) : json({}, 400);
   }
   if (!data || typeof data.id !== 'string' || !uuid.test(data.id) ||
     typeof data.client !== 'string' || !uuid.test(data.client)) return json({}, 400);

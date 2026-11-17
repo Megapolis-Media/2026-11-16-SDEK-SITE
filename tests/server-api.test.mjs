@@ -118,6 +118,30 @@ test('closed track requests cannot be posted; acceptance is idempotent', async (
   assert.equal(first.acceptedAt, second.acceptedAt);
 });
 
+test('rotating guest identifiers cannot bypass the track request network limit', async () => {
+  const studio = defaultStudio(); studio.editions.before.tracksEnabled = true;
+  await call(settings.PUT, '/api/admin/settings', 'PUT', { studio, revision: 0 }, authenticated());
+  const body = () => ({ id: randomUUID(), client: randomUUID(), title: 'A song' });
+  for (let index = 0; index < 60; index++) assert.equal((await call(tracks.POST, '/api/track-requests', 'POST', body())).status, 201);
+  assert.equal((await call(tracks.POST, '/api/track-requests', 'POST', body())).status, 429);
+  assert.equal((await call(tracks.POST, '/api/track-requests', 'POST', body(), { 'cf-connecting-ip': '192.0.2.2' })).status, 201);
+});
+
+test('chat rejects truncated PNG files and animation metadata before persisting an attachment', async () => {
+  const valid = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aLc8AAAAASUVORK5CYII=', 'base64');
+  const animation = Buffer.alloc(20);
+  animation.writeUInt32BE(8, 0); animation.write('acTL', 4); animation.writeUInt32BE(2, 8);
+  for (const bytes of [valid.subarray(0, 24), Buffer.concat([valid.subarray(0, 33), animation, valid.subarray(33)])]) {
+    const form = new FormData();
+    form.set('id', randomUUID()); form.set('client', randomUUID()); form.set('body', 'bad image');
+    form.set('image', new File([bytes], 'image.png', { type: 'image/png' }));
+    const response = await withRequest(new Request('https://cdek-fm.test/api/chat', { method: 'POST', body: form,
+      headers: { origin: 'https://cdek-fm.test', 'cf-connecting-ip': '192.0.2.3' } }), chat.POST);
+    assert.equal(response.status, 415);
+  }
+  assert.equal(await localDB.prepare('SELECT COUNT(*) AS count FROM chat_message').first('count'), 0);
+});
+
 test('support retries create one ticket and one delivery per channel; status updates detect conflicts', async () => {
   const body = { id: randomUUID(), email: 'Listener@Example.com', description: 'Help with the broadcast' };
   const first = await call(support.POST, '/api/support/tickets', 'POST', body);
@@ -239,6 +263,93 @@ test('an invalid moderation cursor is rejected without changing stored data', as
   assert.equal((await call(adminSupport.PATCH, '/api/admin/support', 'PATCH', { action: 'retry', id: 'bad' }, authenticated())).status, 400);
 });
 
+test('every administrative API rejects anonymous and forged editorial headers', async () => {
+  for (const [handler, url, method, body] of [
+    [reports.GET, '/api/admin/report'], [moderation.GET, '/api/admin/chat'], [adminSupport.GET, '/api/admin/support'],
+    [settings.PUT, '/api/admin/settings', 'PUT', {}], [moderation.DELETE, '/api/admin/chat', 'DELETE', { clear: true }],
+    [adminTracks.PATCH, '/api/admin/tracks', 'PATCH', { id: randomUUID(), accepted: true }],
+    [adminSupport.PATCH, '/api/admin/support', 'PATCH', { action: 'email', email: '' }],
+  ]) {
+    for (const headers of [{}, { 'oai-authenticated-user-id': 'forged', 'oai-authenticated-user-email': 'owner@example.com' }]) {
+      assert.equal((await call(handler, url, method, body, headers)).status, 403, url);
+    }
+  }
+});
+
+test('expired sessions and sessions issued before password rotation cannot read the admin API', async () => {
+  const verifier = env.CDEK_ADMIN_PASSWORD_HASH;
+  try {
+    env.CDEK_ADMIN_PASSWORD_HASH = verifier + 'changed';
+    assert.equal((await call(reports.GET, '/api/admin/report', 'GET', undefined, authenticated())).status, 403);
+  } finally { env.CDEK_ADMIN_PASSWORD_HASH = verifier; }
+  database().exec('UPDATE studio_session SET expires_at = 0');
+  assert.equal((await call(reports.GET, '/api/admin/report', 'GET', undefined, authenticated())).status, 403);
+});
+
+test('all JSON write APIs reject non-object bodies without changing application data', async () => {
+  const integrationHeaders = { authorization: 'Bearer ' + token };
+  for (const [handler, url, method, headers] of [
+    [chat.POST, '/api/chat', 'POST'], [tracks.POST, '/api/track-requests', 'POST'],
+    [settings.PUT, '/api/admin/settings', 'PUT', authenticated()],
+    [moderation.DELETE, '/api/admin/chat', 'DELETE', authenticated()],
+    [adminTracks.PATCH, '/api/admin/tracks', 'PATCH', authenticated()],
+    [support.POST, '/api/support/tickets', 'POST'],
+    [adminSupport.PATCH, '/api/admin/support', 'PATCH', authenticated()],
+    [integration.PATCH, '/api/support/integration', 'PATCH', integrationHeaders],
+  ]) {
+    for (const body of [null, [], true, 123, '"text"']) assert.equal((await call(handler, url, method, body, headers)).status, 400, url);
+  }
+  for (const table of ['chat_message', 'track_request', 'support_ticket', 'site_studio']) {
+    assert.equal(await localDB.prepare('SELECT COUNT(*) AS count FROM ' + table).first('count'), 0);
+  }
+});
+
+test('JSON media types are case insensitive; wrong formats and oversized bodies have distinct errors', async () => {
+  for (const [handler, url, method, headers] of [
+    [chat.POST, '/api/chat', 'POST'], [tracks.POST, '/api/track-requests', 'POST'],
+    [settings.PUT, '/api/admin/settings', 'PUT', authenticated()],
+    [moderation.DELETE, '/api/admin/chat', 'DELETE', authenticated()],
+    [adminTracks.PATCH, '/api/admin/tracks', 'PATCH', authenticated()],
+    [support.POST, '/api/support/tickets', 'POST'],
+    [adminSupport.PATCH, '/api/admin/support', 'PATCH', authenticated()],
+  ]) {
+    assert.equal((await call(handler, url, method, {}, { ...headers, 'content-type': 'APPLICATION/JSON; charset=utf-8' })).status, 400, url);
+    assert.equal((await call(handler, url, method, {}, { ...headers, 'content-type': 'text/plain' })).status, 415, url);
+    assert.equal((await call(handler, url, method, 'x'.repeat(81_000), headers)).status, 413, url);
+  }
+});
+
+test('public settings expose only the selected edition and publishing a phase changes its mechanics', async () => {
+  const studio = defaultStudio(); studio.active = 'live'; studio.editions.live.tracksEnabled = true;
+  const saved = await call(settings.PUT, '/api/admin/settings', 'PUT', { studio, revision: 0 }, authenticated());
+  assert.equal(saved.status, 200);
+  const visible = await (await call(publicSettings.GET, '/api/site-settings')).json();
+  assert.deepEqual(Object.keys(visible).sort(), ['contacts', 'edition', 'metrika', 'phase', 'revision']);
+  assert.equal(visible.phase, 'live'); assert.deepEqual(visible.edition, studio.editions.live);
+  const song = { id: randomUUID(), client: randomUUID(), title: 'An on-air song' };
+  assert.equal((await call(tracks.POST, '/api/track-requests', 'POST', song)).status, 201);
+  assert.equal(await localDB.prepare('SELECT phase FROM track_request WHERE id = ?').bind(song.id).first('phase'), 'live');
+});
+
+test('chat pagination uses both timestamp and UUID without losing replies or tied root messages', async () => {
+  const ids = Array.from({ length: 75 }, () => randomUUID()).sort();
+  const insert = database().prepare('INSERT INTO chat_message (id, client_key, body, created_at) VALUES (?, ?, ?, ?)');
+  for (const id of ids) insert.run(id, 'client', 'test', 1000);
+  let cursor = '', read = [];
+  do {
+    const response = await call(chat.GET, '/api/chat' + (cursor ? '?before=' + cursor : ''));
+    assert.equal(response.status, 200);
+    const page = await response.json(); read.push(...page.messages.map(item => item.id)); cursor = page.older;
+  } while (cursor);
+  assert.equal(read.length, ids.length); assert.deepEqual([...new Set(read)].sort(), ids);
+  const reply = randomUUID();
+  database().prepare('INSERT INTO chat_message (id, client_key, body, created_at, parent_id, thread_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(reply, 'client', 'reply', 1001, ids[0], ids[0]);
+  const thread = await (await call(chat.GET, '/api/chat?thread=' + ids[0])).json();
+  assert.equal(thread.root.id, ids[0]); assert.deepEqual(thread.replies.map(item => item.id), [reply]);
+  assert.equal((await call(chat.GET, '/api/chat?before=' + reply)).status, 404);
+});
+
 test('CSV export does not duplicate requests when another song arrives between pages', async t => {
   const db = database();
   const insert = db.prepare('INSERT INTO track_request (id, author_key, author_name, title, artist, phase, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -263,6 +374,17 @@ test('CSV export does not duplicate requests when another song arrives between p
   assert.equal(titles.length, 450);
   assert.equal(new Set(titles).size, 450);
   assert.ok(inserted);
+});
+
+test('CSV export neutralizes spreadsheet formulas and escapes user-controlled quotes and separators', async () => {
+  const title = '=SUM(1;2)\n"quoted"';
+  database().prepare('INSERT INTO track_request (id, author_key, author_name, title, artist, phase, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(randomUUID(), 'guest', '\t=1+1', title, 'Artist; name', 'before', 123);
+  const response = await call(reports.GET, '/api/admin/report?download=tracks', 'GET', undefined, authenticated());
+  const csv = await response.text();
+  assert.ok(csv.includes('"\'=SUM(1;2)\n""quoted"""'));
+  assert.ok(csv.includes('"\'\t=1+1"'));
+  assert.ok(csv.includes('"Artist; name"'));
 });
 
 test('participant CSV keeps stable pages when an existing author sends another message', async t => {

@@ -6,7 +6,7 @@ Production: `cdek-fm.ru`, сервер `194.58.103.93`, Ubuntu 24.04, Docker Com
 
 1. Команда с подтверждённым прямым доступом (`megapolisbroadcasting`, `Knyazzer`, владелец `Megapolis-Media`) работает в единой dev: pull → изменения → проверки → commit → повторная синхронизация → push в ту же dev. Личные ветки и PR в dev для команды не используются; внешние участники без прямого доступа присылают PR. Владелец `Megapolis-Media` выпускает dev → master отдельным PR с merge commit.
 2. `.github/workflows/deploy.yml` запускается при push в `master`. Ручной запуск разрешён только для `master`.
-3. Job ожидает подтверждения аккаунтом `Megapolis-Media` в environment `production` (Review deployments → Approve and deploy). Без подтверждения сборка и выкладка не стартуют; обход администраторами выключен. После подтверждения GitHub Actions собирает образ `cdek-fm:<полный SHA коммита>` с тестами серверного хранилища, TypeScript и production-сборкой.
+3. Job ожидает подтверждения аккаунтом `Megapolis-Media` в environment `production` (Review deployments → Approve and deploy). Без подтверждения сборка и выкладка не стартуют; обход администраторами выключен. После подтверждения GitHub Actions собирает образ `cdek-fm:<полный SHA коммита>` с полным ESLint, тестами зависимостей и серверных API/хранилища, TypeScript, production-сборкой и HTTP-проверками самостоятельного пакета.
 4. Образ передаётся через SSH пользователю `cdek-deploy`. Его ключ разрешает только запуск root-owned скрипта `/usr/local/sbin/cdek-fm-deploy`; интерактивный shell, SFTP и forwarding для этого ключа отключены.
 5. Скрипт сериализует выкладки через `flock`, останавливает предыдущий контейнер, делает резервную копию данных, применяет миграции и ждёт успешного healthcheck. На время смены версии возможен короткий перерыв.
 
@@ -15,6 +15,8 @@ Production: `cdek-fm.ru`, сервер `194.58.103.93`, Ubuntu 24.04, Docker Com
 ## Запуск и данные
 
 Серверная сборка сохраняет приложение vinext/React и использует Node.js 24 LTS. Для неё `CDEK_RUNTIME=node` выбирает SQLite и файловое хранилище вместо привязок Cloudflare D1/R2. Изначальный режим Cloudflare остаётся доступен через прежние команды.
+
+Сборка Node создаёт `dist/standalone`; Docker копирует его runtime и запускает `node server.js`, сохраняя отдельно `server/`, `drizzle/` и скрипт миграций. Полный `node_modules` разработчика в конечный образ не копируется. Перед выпуском изменений из аудита 18 ноября нужно проверить Linux Docker build и применить миграцию `0005_track_client_limit.sql` штатным шагом выкладки; локальный аудит production не обновляет.
 
 ```sh
 npm run install:ci

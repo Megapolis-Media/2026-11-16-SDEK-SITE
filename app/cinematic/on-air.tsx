@@ -1,16 +1,17 @@
 'use client';
 
-import { createContext, type CSSProperties, type ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, type CSSProperties, type ReactNode, useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import NextImage from 'next/image';
 import { Icon } from './icons';
 import { GreetingLink } from './greetings';
 import { useRadio } from './use-radio';
 import { metric } from './metrika';
 import { SupportButton } from './support-dialog';
+import { useMotionPreference } from './motion-preference';
 
 type Mode = 'idle' | 'radio' | 'facecast' | 'archive';
 type StopArchive = () => void;
-const motionStorageKey = 'cdek-fm-3d-motion';
 
 function useOnAirController(radioSource: string, videoSource: string, radioEnabled: boolean, tvEnabled: boolean) {
   const radio = useRadio(radioSource);
@@ -18,22 +19,8 @@ function useOnAirController(radioSource: string, videoSource: string, radioEnabl
   const archiveStop = useRef<StopArchive | null>(null);
   const previousSources = useRef({ radioSource, videoSource });
   const [mode, setMode] = useState<Mode>('idle');
-  const [systemReduced, setSystemReduced] = useState(false);
-  const [motionChoice, setMotionChoice] = useState<'on' | 'off' | null>(null);
+  const [motionPaused, setMotionPaused] = useMotionPreference();
   const [motionReady, setMotionReady] = useState(false);
-  const motionPaused = motionChoice === null ? systemReduced : motionChoice === 'off';
-
-  useEffect(() => {
-    const query = matchMedia('(prefers-reduced-motion: reduce)');
-    const sync = () => setSystemReduced(query.matches);
-    sync();
-    try {
-      const stored = localStorage.getItem(motionStorageKey);
-      if (stored === 'on' || stored === 'off') setMotionChoice(stored);
-    } catch { /* Storage can be disabled. */ }
-    query.addEventListener('change', sync);
-    return () => query.removeEventListener('change', sync);
-  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -41,11 +28,6 @@ function useOnAirController(radioSource: string, videoSource: string, radioEnabl
     return () => { delete root.dataset.cdekMotion; };
   }, [motionPaused]);
 
-  function setMotionPaused(paused: boolean) {
-    const choice = paused ? 'off' : 'on';
-    setMotionChoice(choice);
-    try { localStorage.setItem(motionStorageKey, choice); } catch { /* Keep the selection for this visit. */ }
-  }
 
   function select(next: Mode) {
     active.current = next;
@@ -113,10 +95,13 @@ function useOnAirController(radioSource: string, videoSource: string, radioEnabl
     select('idle');
   }
 
-  useEffect(() => {
+  const syncSources = useEffectEvent(() => {
     if (active.current === 'radio' && (!radioEnabled || previousSources.current.radioSource !== radioSource)) stopRadio();
     if (active.current === 'facecast' && (!tvEnabled || previousSources.current.videoSource !== videoSource)) closeFacecast();
     previousSources.current = { radioSource, videoSource };
+  });
+  useEffect(() => {
+    syncSources();
   }, [radioEnabled, tvEnabled, radioSource, videoSource]);
 
   return { radio, mode, videoSource, radioEnabled, tvEnabled, startRadio, stopRadio, openFacecast, closeFacecast, openArchive, archiveClosed,
@@ -216,7 +201,7 @@ export function AirDock({ chatTarget, onOpenSupport }: { chatTarget?: 'chat' | '
 
   return <aside className="air-dock" aria-label="Плеер CDEK FM" data-mode={mode} data-radio={radio.status}>
     <div className="air-identity">
-      <img src="/visual/cdek-fm.svg" alt="CDEK FM" width="104" height="19" />
+      <NextImage unoptimized loading="eager" src="/visual/cdek-fm.svg" alt="CDEK FM" width="104" height="19" />
       <span className="air-radio-status" role="status" title={status}><i aria-hidden="true" />{status}</span>
     </div>
     <div className="air-controls">
@@ -261,7 +246,7 @@ export function FacecastScreen() {
       ? <iframe src={videoSource} title="Телерадиоэфир СДЭК в Facecast" allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
         allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
       : <button type="button" className="air-screen-start" onClick={openFacecast} disabled={!tvEnabled} aria-label="Смотреть эфир">
-        <img className="air-screen-logo" src="/visual/cdek-fm.svg" alt="" width="104" height="19" />
+        <NextImage unoptimized loading="eager" className="air-screen-logo" src="/visual/cdek-fm.svg" alt="" width="104" height="19" />
         <span className="air-screen-play"><Icon name="play" size={30} /></span>
       </button>}
   </div>;

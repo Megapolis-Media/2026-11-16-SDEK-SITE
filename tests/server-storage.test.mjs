@@ -1,6 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, copyFileSync, appendFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, copyFileSync, appendFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { database, localDB, localBucket, migrate } from '../server/storage.mjs';
 
@@ -31,6 +32,27 @@ test('numbered bindings retain repeated values and RETURNING results', async () 
   assert.equal(row.literal, '?1');
   const removed = await localDB.prepare('DELETE FROM chat_message WHERE id = ? RETURNING id').bind('test-message').all();
   assert.equal(removed.results[0].id, 'test-message');
+});
+
+test('SQLite and its directory are private to the application owner', { skip: process.platform === 'win32' }, () => {
+  assert.equal(statSync(directory).mode & 0o777, 0o700);
+  assert.equal(statSync(path.join(directory, 'cdek.sqlite')).mode & 0o777, 0o600);
+});
+
+test('the track limit migration preserves old requests and remains compatible with the previous writer', () => {
+  const legacy = new DatabaseSync(':memory:');
+  try {
+    for (const filename of readdirSync('drizzle').filter(name => /^000[0-4]_.*\.sql$/.test(name)).sort()) {
+      legacy.exec(readFileSync(path.join('drizzle', filename), 'utf8'));
+    }
+    const oldInsert = 'INSERT INTO track_request (id, author_key, author_name, title, artist, phase, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    legacy.prepare(oldInsert).run('old-track', 'guest', 'Guest', 'Keep this song', '', 'before', 123);
+    legacy.exec(readFileSync('drizzle/0005_track_client_limit.sql', 'utf8'));
+    assert.equal(legacy.prepare('SELECT title FROM track_request WHERE id = ?').get('old-track').title, 'Keep this song');
+    assert.equal(legacy.prepare('SELECT client_key FROM track_request WHERE id = ?').get('old-track').client_key, null);
+    legacy.prepare(oldInsert).run('rollback-track', 'guest', 'Guest', 'Old writer still works', '', 'before', 124);
+    assert.equal(legacy.prepare('SELECT COUNT(*) AS count FROM track_request').get().count, 2);
+  } finally { legacy.close(); }
 });
 
 test('a failed batch rolls back earlier writes', async () => {

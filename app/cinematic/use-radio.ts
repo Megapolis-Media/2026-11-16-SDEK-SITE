@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { makeAudioMeter, type MeterFrame } from './audio-meter';
 
 export type RadioStatus = 'stopped' | 'connecting' | 'playing' | 'error';
@@ -232,10 +232,12 @@ export function useRadio(source: string) {
     if (active.current && !active.current.node) active.current.audio.volume = next;
   }
 
+  const stopOnPageHide = useEffectEvent(stop);
   useEffect(() => {
-    window.addEventListener('pagehide', stop);
+    const hidden = () => stopOnPageHide();
+    window.addEventListener('pagehide', hidden);
     return () => {
-      window.removeEventListener('pagehide', stop);
+      window.removeEventListener('pagehide', hidden);
       release();
       void graph.current?.context.close().catch(() => {});
       graph.current = undefined;

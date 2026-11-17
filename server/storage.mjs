@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -14,7 +14,9 @@ export function database() {
     return globalThis[stateKey].connection;
   }
   mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
   const connection = new DatabaseSync(filename);
+  chmodSync(filename, 0o600);
   connection.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   globalThis[stateKey] = { filename, connection };
   return connection;

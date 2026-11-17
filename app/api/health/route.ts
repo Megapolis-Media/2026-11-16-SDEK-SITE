@@ -15,7 +15,7 @@ export async function GET() {
       chat.editorial, chat.thread_id, chat.parent_id, chat.image_key, chat.image_type,
       chat.image_digest, chat.image_width, chat.image_height,
       moderation.revision, tracks.id, tracks.author_key, tracks.author_name,
-      tracks.title, tracks.artist, tracks.phase, tracks.created_at, tracks.accepted_at,
+      tracks.title, tracks.artist, tracks.phase, tracks.created_at, tracks.accepted_at, tracks.client_key,
       tickets.id, tickets.number, tickets.email, tickets.description,
       tickets.status, tickets.created_at, tickets.updated_at,
       delivery.ticket_id, delivery.channel, delivery.state, delivery.attempts, delivery.updated_at, delivery.error,

@@ -47,6 +47,7 @@ export function Metrika({ id }: { id: string }) {
     };
   }, [id]);
   return id ? <noscript>
+    {/* eslint-disable-next-line @next/next/no-img-element -- This is a non-JavaScript tracking pixel, not content for the image optimizer. */}
     <img src={'https://mc.yandex.ru/watch/' + id} width={1} height={1}
       style={{ position: 'absolute', left: -9999 }} alt="" />
   </noscript> : null;

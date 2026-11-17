@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function MotionPage() {
-  return <MotionStudy />;
+export default async function MotionPage({ searchParams }: { searchParams: Promise<{ variant?: string | string[] }> }) {
+  const { variant } = await searchParams;
+  return <MotionStudy initialVariant={Array.isArray(variant) ? variant[0] : variant} />;
 }

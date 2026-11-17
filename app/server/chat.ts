@@ -65,6 +65,10 @@ export async function visitor(request: Request, client: string, name: string) {
   return { id, fingerprint, editorial, name: editorial ? editorName : (nickname && !reserved.test(nickname) ? nickname : 'Гость ' + id.slice(0, 5).toUpperCase()) };
 }
 
+export function mediaType(request: Request) {
+  return request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() ?? '';
+}
+
 export async function readBytes(request: Request, limit: number) {
   if (Number(request.headers.get('content-length')) > limit) throw new RangeError();
   const reader = request.body?.getReader();
@@ -95,7 +99,20 @@ export function inspectImage(buffer: ArrayBuffer) {
     width > 0 && height > 0 && width <= maxImageEdge && height <= maxImageEdge ? { type, width, height } : null;
   if (data.byteLength < 24) return null;
   if (data.getUint32(0) === 0x89504e47 && data.getUint32(4) === 0x0d0a1a0a && tag(12, 'IHDR')) {
-    return image('image/png', data.getUint32(16), data.getUint32(20));
+    if (data.getUint32(8) !== 13) return null;
+    const dimensions = image('image/png', data.getUint32(16), data.getUint32(20));
+    if (!dimensions) return null;
+    let hasPixels = false;
+    for (let at = 8; at + 12 <= data.byteLength;) {
+      const length = data.getUint32(at);
+      if (length > data.byteLength - at - 12) return null;
+      if (tag(at + 4, 'acTL') || tag(at + 4, 'fcTL') || tag(at + 4, 'fdAT')) return null;
+      if (tag(at + 4, 'IHDR') && at !== 8) return null;
+      if (tag(at + 4, 'IDAT')) hasPixels = true;
+      if (tag(at + 4, 'IEND')) return length === 0 && hasPixels && at + 12 === data.byteLength ? dimensions : null;
+      at += length + 12;
+    }
+    return null;
   }
   if (tag(0, 'RIFF') && tag(8, 'WEBP') && data.getUint32(4, true) + 8 === data.byteLength && data.byteLength >= 30) {
     if (tag(12, 'VP8X')) {

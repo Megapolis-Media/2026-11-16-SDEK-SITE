@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import { z } from 'zod';
 import { uuid } from '../../../chat-types';
-import { listMessages, messageById, readBytes } from '../../../server/chat';
+import { listMessages, mediaType, messageById, readBytes } from '../../../server/chat';
 import { isEditor, json, sameOrigin } from '../../../server/studio';
 import { withApiErrors } from '../../../server/api-errors';
 
@@ -30,7 +30,7 @@ async function removeMessages(request: Request) {
   if (!sameOrigin(request) || !await isEditor()) return json({ error: 'Нужен доступ редакции.' }, 403);
   const { DB: db, BUCKET: bucket } = env;
   if (!db) return json({ error: 'Чат временно недоступен.' }, 503);
-  if (!request.headers.get('content-type')?.startsWith('application/json')) return json({}, 415);
+  if (mediaType(request) !== 'application/json') return json({}, 415);
   let raw: unknown;
   try { raw = JSON.parse(new TextDecoder().decode(await readBytes(request, 80_000))); }
   catch (error) { return json({}, error instanceof RangeError ? 413 : 400); }
