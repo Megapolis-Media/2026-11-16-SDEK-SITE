@@ -1,0 +1,41 @@
+name: Deploy production
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cdek-fm-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and test image
+        run: docker build --pull --tag "cdek-fm:$GITHUB_SHA" .
+      - name: Export image
+        run: docker save "cdek-fm:$GITHUB_SHA" | gzip -1 > "$RUNNER_TEMP/cdek-fm-image.tar.gz"
+      - name: Deploy over restricted SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$RUNNER_TEMP/deploy-ssh"
+          trap 'rm -f "$RUNNER_TEMP/deploy-ssh/key"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/deploy-ssh/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/deploy-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/deploy-ssh/key"
+          ssh -i "$RUNNER_TEMP/deploy-ssh/key" -p "${DEPLOY_PORT:-22}" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/deploy-ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$GITHUB_SHA" < "$RUNNER_TEMP/cdek-fm-image.tar.gz"

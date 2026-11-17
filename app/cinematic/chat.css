@@ -1,0 +1,147 @@
+:is(.air-content, .route-return) .hero-description { white-space: pre-line; }
+.air-content section[data-suppressed="true"] { min-height: clamp(120px, 28svh, 430px); padding-block: 0; }
+.air-content section[data-suppressed="true"] > * { display: none; }
+.live-stage { --scene-intensity: 1; }
+.has-cgi .live-stage .route-canvas { opacity: var(--scene-intensity); }
+.live-stage .stage-still { opacity: calc((.25 + .75 * var(--hero-weight)) * var(--scene-intensity)); }
+.activity-content:disabled { opacity: .54; }
+.air-facecast:disabled, .air-volume:has(input:disabled) { opacity: .47; }
+.circuit-track { display: flex; justify-content: flex-end; }
+.circuit-preview-ticket img {
+  width: 100%; height: clamp(43px, 8svh, 80px); object-fit: contain;
+  background: #0f564837; border-radius: 4px;
+}
+.circuit-preview-ticket img[hidden] { display: none; }
+.circuit-preview-ticket img:not([hidden]) + span:not(:empty) { margin-top: 5px; }
+.circuit-preview-ticket span:empty { display: none; }
+.wall-panel {
+  --wall-text: #effff8;
+  --wall-muted: #a9cdc3;
+  --wall-link: #85f0bc;
+  --wall-row: #081f27cc;
+  --wall-field: #071e25;
+  --wall-border: #b6fbd638;
+  --wall-line: #87e2bb36;
+  --wall-editor: #1a4639;
+  --wall-avatar: #18453f;
+  --wall-accent: #3ae99a;
+  color: var(--wall-text);
+}
+.wall-panel :is(input, button, textarea) { font: inherit; }
+.wall-panel .wall-list {
+  height: clamp(205px, 33svh, 350px); padding: 13px;
+  overscroll-behavior: contain;
+}
+.air-content :is(.greeting-composer,.circuit-panel) .wall-list { height: clamp(208px, 29svh, 305px); }
+.wall-panel .wall-compose {
+  display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; padding: 12px;
+  border: 0; border-bottom: 1px solid var(--wall-line); background: transparent;
+}
+.wall-compose-row { display: grid; grid-template-columns: 40px minmax(0,1fr) 41px; align-items: end; gap: 6px; }
+.wall-panel .wall-compose textarea,
+.wall-panel .wall-name input {
+  display: block; min-height: 40px; margin: 0; padding: 9px 10px; border: 1px solid var(--wall-border); border-radius: 9px;
+  background: var(--wall-field); color: var(--wall-text); width: 100%; font-size: 16px;
+}
+.wall-panel .wall-compose textarea { min-height: 42px; max-height: 130px; resize: vertical; }
+.wall-panel .wall-name input { min-height: 32px; padding: 5px 8px; font-size: 16px; }
+.wall-compose :is(input, textarea)::placeholder { color: var(--wall-muted); }
+.wall-name { display: block; font-size: 12px; color: var(--wall-text); }
+.wall-name > span { color: var(--wall-muted); }
+.wall-name > input { margin-top: 4px !important; }
+.wall-panel .wall-compose button { width: auto; height: auto; min-width: 0; }
+.wall-panel .wall-compose-row > button { width: 100%; height: 41px; min-width: 0; }
+.wall-panel .wall-compose .wall-send { background: var(--wall-accent); color: #073129; }
+.wall-panel .wall-compose .wall-add-image { background: var(--wall-field); border: 1px solid var(--wall-border); color: var(--wall-link); }
+.wall-panel .wall-compose .wall-add-image:hover:not(:disabled) { background: var(--wall-avatar); }
+.wall-file, .wall-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.wall-attached { display: flex; align-items: center; gap: 9px; font-size: 12px; min-width: 0; }
+.wall-attached img { width: 76px; height: 54px; object-fit: cover; border-radius: 7px; border: 1px solid var(--wall-border); }
+.wall-panel .wall-compose :is(.wall-attached, .wall-reply-target) button {
+  display: inline-flex; padding: 4px 6px; color: var(--wall-link); background: none; font-size: 12px; text-align: left;
+}
+.wall-panel .wall-compose :is(.wall-attached, .wall-reply-target) button:hover { background: var(--wall-avatar); }
+.wall-reply-target, .wall-compose-as { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--wall-muted); font-size: 12px; }
+.wall-reply-target span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.wall-editor-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--wall-editor); color: var(--wall-link); }
+.wall-panel .wall-notice { font-size: 12px; color: var(--wall-link); overflow-wrap: anywhere; }
+.wall-empty { min-height: 130px; display: grid; justify-items: center; align-content: center; gap: 10px; color: var(--wall-muted); font-size: 13px; }
+.wall-empty svg { color: var(--wall-link); }
+.wall-panel .wall-message {
+  display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; padding: 10px 11px; margin: 0 0 7px;
+  background: var(--wall-row); color: var(--wall-text); border: 1px solid var(--wall-border); border-radius: 10px; line-height: 1.38;
+}
+.wall-panel .wall-message:is(:hover, [data-editorial="true"], [data-selected="true"]) { border-color: var(--wall-line); background: var(--wall-row); }
+.wall-panel .wall-message[data-selected="true"] { border-color: var(--wall-link); }
+.wall-panel .wall-message-meta { display: grid; grid-template-columns: 24px minmax(0,1fr) auto; gap: 7px; align-items: center; min-width: 0; }
+.wall-panel .wall-message-meta strong { overflow-wrap: anywhere; font-size: 12px; }
+.wall-panel .wall-message[data-editorial="true"] .wall-message-meta strong { color: var(--wall-link); }
+.wall-panel .wall-message time { color: var(--wall-muted); font-size: 11px; }
+.wall-avatar { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--wall-avatar); color: var(--wall-link); font-size: 11px; font-weight: 700; }
+.wall-panel .wall-message-body { margin: 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wall-in-reply { font-size: 11px; color: var(--wall-muted); overflow-wrap: anywhere; }
+.wall-message-image { display: block; width: fit-content; max-width: 100%; }
+.wall-message-image img { max-height: 185px; width: auto; height: auto; max-width: 100%; border-radius: 7px; background: var(--wall-field); }
+.wall-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.wall-actions button, .wall-more {
+  display: inline-flex; gap: 4px; align-items: center; padding: 3px 2px; min-height: 27px;
+  background: none; border: 0; color: var(--wall-link); font-size: 12px !important; font-weight: 650 !important;
+}
+.wall-actions button:hover, .wall-more:hover { text-decoration: underline; }
+.wall-actions .wall-3d { margin-inline-start: auto; min-width: 32px; justify-content: center; color: var(--wall-muted); }
+.wall-actions .wall-3d:hover { color: var(--wall-link); }
+.wall-replies { margin: 2px 0 13px 12px; border-inline-start: 1px solid var(--wall-line); padding-inline-start: 8px; }
+.wall-replies .wall-compose { margin-top: 3px; border: 1px solid var(--wall-line); border-radius: 10px; padding: 8px; }
+.wall-loading { color: var(--wall-muted); font-size: 12px; }
+.greeting-dock { position: relative; }
+.wall-packed {
+  position: absolute; inset: 15px 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 11px;
+  padding: 16px; border: 1px solid #83e7be61; border-radius: 17px; background: #0a3536e8; font-size: 14px;
+}
+.wall-packed > svg { color: #7cf1b4; }
+.wall-packed button, .track-open {
+  display: inline-flex; align-items: center; gap: 9px; padding: 10px 13px;
+  border: 1px solid #7de8b26a; background: #092d30; color: #b7ffdb; border-radius: 9px; font-size: 13px; font-weight: 650;
+}
+.wall-packed button:hover, .track-open:hover { background: #15513f; }
+.chat-copy .track-open { margin-top: 18px; }
+.track-dialog {
+  width: min(430px, calc(100% - 32px)); max-height: calc(100% - 28px); color: #effff8; background: #0b3033;
+  border: 1px solid #a3f5cb7d; border-radius: 18px; padding: 22px; box-shadow: 0 24px 100px #001214b5; font-family: inherit;
+}
+.track-dialog::backdrop { background: #001416ba; backdrop-filter: blur(5px); }
+.track-dialog form { display: grid; gap: 14px; }
+.track-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.track-heading h2 { font-size: 22px; }
+.track-close {
+  width: 34px; height: 34px; flex: none; border: 1px solid #6dba9866; border-radius: 8px;
+  background: transparent; color: #b4e3cc; font-size: 24px; line-height: 1;
+}
+.track-dialog label { display: grid; gap: 5px; font-size: 13px; }
+.track-dialog label span { color: #a7ccbf; font-size: 11px; display: inline; }
+.track-dialog input { min-width: 0; width: 100%; padding: 10px 11px; border: 1px solid #6dba9880; border-radius: 8px; color: #effff8; background: #061e25; font: inherit; font-size: 16px; }
+.track-dialog p { color: #aafbd4; font-size: 14px; }
+.track-submit { padding: 12px; border: 0; border-radius: 8px; color: #05271c; font-weight: 700; background: #3be99b; }
+@media (max-width: 720px) {
+  .wall-panel .wall-compose { padding: 8px; }
+  .wall-panel .wall-list { padding: 8px; }
+  .circuit-panel .wall-list { min-height: 186px; }
+  .wall-replies { margin-inline-start: 7px; padding-inline-start: 5px; }
+}
+
+.circuit-chat { position: relative; }
+.chat-anchor { position: absolute; top: 0; left: 0; scroll-margin-top: 80px; }
+.wall-panel .wall-compose-simple { padding: 16px; gap: 12px; }
+.wall-panel .wall-compose-simple .wall-compose-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.wall-compose-simple .wall-compose-row > :is(label, textarea) { grid-column: 1 / -1; }
+.wall-message-label { color: var(--wall-text); font-size: 12px; }
+.wall-panel .wall-compose-simple .wall-name input { min-height: 42px; padding: 9px 11px; }
+.wall-panel .wall-compose-simple textarea { min-height: 82px; padding: 10px 11px; }
+.wall-panel .wall-compose-simple :is(.wall-send, .wall-add-image) {
+  display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; margin-top: 4px;
+  font-size: 13px; font-weight: 650;
+}
+.wall-compose-simple .wall-compose-row > button > svg { flex: none; }
+.wall-panel .wall-feed-title { margin: 0; padding: 12px 16px 0; color: var(--wall-muted); font-size: 12px; font-weight: 600; }
