@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { blockPresentation, type Edition } from '../studio-config';
-import { mountArtwork } from '../motion/artwork.js';
 import { useGreetings } from './greetings';
 import { useOnAir } from './on-air';
 import { chapterAt, chapters, clamp, cycleChapter, cycleLength, easeBetween, returnId, sceneAt, wrapScroll } from './scroll-route';
@@ -72,6 +71,7 @@ export function LiveScene({ edition }: { edition: Edition }) {
     let atEnd = false;
     let touch: { id: number; x: number; y: number; lastY: number; edge: number; blocked: number; manual: boolean } | null = null;
     let dispose: undefined | (() => void);
+    let closed = false;
 
     function pageBounds(node: HTMLElement | null) {
       const box = node?.getBoundingClientRect();
@@ -336,7 +336,8 @@ export function LiveScene({ edition }: { edition: Edition }) {
     cancelAnimationFrame(requested);
     update();
 
-    try {
+    void import('../motion/artwork.js').then(({ mountArtwork }) => {
+      if (closed) return;
       dispose = mountArtwork(target, {
         progress: () => position,
         chapterAt: (progress: number) => cycleChapter(progress, atEnd),
@@ -353,13 +354,12 @@ export function LiveScene({ edition }: { edition: Edition }) {
         projectParcels,
         presentGreeting,
         ready: () => {
+          if (closed) return;
           element.classList.add('has-cgi');
           setMotionReady(true);
         },
       });
-    } catch {
-      setUnavailable(true);
-    }
+    }).catch(() => { if (!closed) setUnavailable(true); });
 
     const observer = new ResizeObserver(measure);
     sections.forEach(section => { if (section) observer.observe(section); });
@@ -380,6 +380,8 @@ export function LiveScene({ edition }: { edition: Edition }) {
     window.visualViewport?.addEventListener('resize', measure, { passive: true });
 
     return () => {
+      closed = true;
+      setMotionReady(false);
       motionChanged.current = null;
       cancelAnimationFrame(requested);
       observer.disconnect();

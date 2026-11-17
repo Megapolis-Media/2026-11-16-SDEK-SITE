@@ -25,10 +25,11 @@ node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1
 
 ## Проверки
 
+Для полной проверки платформы на Node 24: чистая установка, линтер, типизация, тесты, обе сборки и HTTP-проверка самостоятельного сервера. Проверка зависимостей отдельно обращается к npm-реестру и проверяет локальную защиту, описанную в [техническом аудите](AUDIT-2026-11-18.md).
+
 ```sh
-npm exec -- tsc --noEmit
-npm run lint
-npm run build
+npm run check
+npm run audit:dependencies
 ```
 
 Правила веток и pull request описаны в [CONTRIBUTING.md](../CONTRIBUTING.md) и [AGENTS.md](../AGENTS.md).

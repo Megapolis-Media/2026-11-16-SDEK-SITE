@@ -1,9 +1,9 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import NextImage from 'next/image';
 import { Icon } from './icons';
 import { useOnAir } from './on-air';
-import { mountArchiveParcel } from '../motion/artwork.js';
 import { dialHref, type Contacts } from '../studio-config';
 import './archive-parcel.css';
 
@@ -11,7 +11,7 @@ function MaxContact({ url, phone }: { url: string; phone: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const number = useRef<HTMLInputElement>(null);
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'selected'>('idle');
-  const icon = <img src="/visual/max.webp" width="22" height="22" alt="" />;
+  const icon = <NextImage unoptimized loading="eager" src="/visual/max.webp" width="22" height="22" alt="" />;
 
   async function copyNumber() {
     try {
@@ -63,7 +63,7 @@ export function ContactLinks({ contacts, includePhone, showMessengerNumber }: {
     </a>}
     {telegram && <a className="contact-link" href={telegram} target="_blank" rel="noopener noreferrer"
       aria-label="Telegram" title="Telegram">
-      <img src="/visual/telegram.svg" width="22" height="22" alt="" />
+        <NextImage unoptimized loading="eager" src="/visual/telegram.svg" width="22" height="22" alt="" />
     </a>}
     {contacts.maxEnabled && <MaxContact url={contacts.maxUrl} phone={contacts.messengerNumber} />}
     {showMessengerNumber && contacts.messengerNumber && (numberLink
@@ -130,26 +130,26 @@ function MediaDialog({ source, label, children, className }: { source: string; l
 type ArchiveEntry = { image: string; title: string; date: string; source: string; cover: string; external?: string };
 
 function ArchiveParcel({ entry }: { entry: ArchiveEntry }) {
-  const [revealed, setRevealed] = useState(false);
+  const [opened, setRevealed] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null);
   const replay = useRef<(() => void) | null>(null);
   const { leaveForArchive, motionPaused } = useOnAir();
+  const revealed = motionPaused || opened;
   const screenId = 'archive-recording-' + entry.cover;
-  const cover = <span className="archive-art"><img src={entry.image} width="960" height="540" alt="" loading="lazy" /></span>;
+  const cover = <span className="archive-art"><NextImage unoptimized src={entry.image} width="960" height="540" alt="" loading="lazy" /></span>;
 
   useEffect(() => {
-    if (motionPaused) {
-      setRevealed(true);
-      return;
-    }
-    if (!canvas.current) return;
-    try {
-      const animation = mountArchiveParcel(canvas.current, entry.image, setRevealed);
+    const target = canvas.current;
+    if (motionPaused || !target) return;
+    let closed = false;
+    let dispose: (() => void) | undefined;
+    void import('../motion/artwork.js').then(({ mountArchiveParcel }) => {
+      if (closed) return;
+      const animation = mountArchiveParcel(target, entry.image, (value: boolean) => { if (!closed) setRevealed(value); });
       replay.current = animation.replay;
-      return () => { replay.current = null; animation.dispose(); };
-    } catch {
-      setRevealed(true);
-    }
+      dispose = animation.dispose;
+    }).catch(() => { if (!closed) setRevealed(true); });
+    return () => { closed = true; replay.current = null; dispose?.(); };
   }, [entry.image, motionPaused]);
 
   return <article className="archive-card" data-revealed={revealed}>

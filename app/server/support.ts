@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { type SupportDelivery, type SupportStatus, type SupportTicket } from '../support-types';
-import { readBytes } from './chat';
+import { mediaType, readBytes } from './chat';
 import { json } from './studio';
 
 const ticketFields = 'number, id, email, description, status, created_at AS createdAt, updated_at AS updatedAt';
@@ -12,7 +12,7 @@ function database() {
 }
 
 export async function readSupportBody(request: Request): Promise<{ body: unknown } | { error: Response }> {
-  if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
+  if (mediaType(request) !== 'application/json') {
     return { error: json({ error: 'Ожидается запрос в формате JSON.' }, 415) };
   }
   try {

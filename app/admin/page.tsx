@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import NextImage from 'next/image';
 import { chatGPTSignInPath, chatGPTSignOutPath, getChatGPTUser } from '../chatgpt-auth';
 import { editorFor, readStudio } from '../server/studio';
 import { hasStudioSession } from '../server/studio-session';
@@ -22,7 +23,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const message = typeof error === 'string' && Object.hasOwn(errors, error) ? errors[error] : '';
   return <main className="studio-login">
     <section className="studio-login-card" aria-labelledby="studio-login-title">
-      <img src="/visual/cdek-fm.svg" width="136" height="24" alt="СДЭК FM" />
+    <NextImage unoptimized loading="eager" src="/visual/cdek-fm.svg" width="136" height="24" alt="СДЭК FM" />
       <h1 id="studio-login-title">Вход для редакции</h1>
       {message && <p className="studio-login-error" role="alert">{message}</p>}
       <form className="studio-login-form" method="post" action="/api/admin/session">

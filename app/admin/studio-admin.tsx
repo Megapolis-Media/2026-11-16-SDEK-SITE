@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import NextImage from 'next/image';
 import { editorName, type GreetingMessage, type TrackItem } from '../chat-types';
 import { GreetingProvider, useGreetings } from '../cinematic/greetings';
 import { Icon } from '../cinematic/icons';
@@ -136,7 +137,7 @@ function BlockPreview({ edition, current, phase }: { edition: Edition; current: 
     <section className="studio-card">
       <div className="studio-preview-title"><Glyph name="eye" size={18} /><h2>Предпросмотр</h2></div>
       <div className="studio-scene" data-look={block.visual} data-visible={block.visible}>
-        <img className="studio-scene-logo" src="/visual/cdek-fm.svg" alt="СДЭК FM" width="79" height="14" />
+        <NextImage unoptimized loading="eager" className="studio-scene-logo" src="/visual/cdek-fm.svg" alt="СДЭК FM" width="79" height="14" />
         {block.visible ? <>
           <div className="studio-scene-copy"><strong>{title} {accent && <em>{accent}</em>}</strong>{detail && <p>{detail}</p>}</div>
           {current === 'broadcast' && <span className="studio-scene-date"><Glyph name="clock" size={13} />{edition.hero.date}</span>}
@@ -281,20 +282,24 @@ function ChatModeration({ onModerated }: { onModerated: () => void }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState(false);
 
-  const load = useCallback(async (before?: string, signal?: AbortSignal) => {
-    setLoading(true);
-    setError(false);
-    try {
-      const response = await fetch('/api/admin/chat' + (before ? '?before=' + before : ''), { cache: 'no-store', signal });
+  const load = useCallback((before?: string, signal?: AbortSignal) => {
+    return fetch('/api/admin/chat' + (before ? '?before=' + before : ''), { cache: 'no-store', signal }).then(async response => {
       if (!response.ok) throw new Error();
-      const result: ModerationPage = await response.json();
+      return await response.json() as ModerationPage;
+    }).then(result => {
       if (signal?.aborted) return;
       setPage(previous => before && previous
         ? { messages: [...previous.messages, ...result.messages], older: result.older } : result);
       if (!before) setSelected(new Set());
-    } catch { if (!signal?.aborted) setError(true); }
-    finally { if (!signal?.aborted) setLoading(false); }
+    }).catch(() => { if (!signal?.aborted) setError(true); })
+      .finally(() => { if (!signal?.aborted) setLoading(false); });
   }, []);
+
+  function reload(before?: string) {
+    setLoading(true);
+    setError(false);
+    void load(before);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -326,7 +331,7 @@ function ChatModeration({ onModerated }: { onModerated: () => void }) {
   const locked = loading || busy || Boolean(confirm);
   return <Card title="Управление сообщениями">
     <div className="studio-moderation-actions">
-      <button type="button" className="studio-secondary" disabled={locked} onClick={() => void load()}>Обновить список</button>
+      <button type="button" className="studio-secondary" disabled={locked} onClick={() => reload()}>Обновить список</button>
       <button type="button" className="studio-secondary" disabled={locked || !selected.size}
         onClick={() => { setNotice(''); setConfirm('selected'); }}>Удалить выбранные{selected.size ? ` (${selected.size})` : ''}</button>
       <button type="button" className="studio-danger" disabled={locked || !page?.messages.length}
@@ -360,11 +365,11 @@ function ChatModeration({ onModerated }: { onModerated: () => void }) {
           }} />
         <span><strong>{item.authorName}</strong><small>{date.format(item.createdAt)}{item.threadId ? ' · Ответ' : ''}</small>
           <span>{item.body || 'Фото'}</span></span>
-        {item.imageUrl && <img src={item.imageUrl} alt="Фото" width={46} height={40} loading="lazy" />}
+        {item.imageUrl && <NextImage unoptimized src={item.imageUrl} alt="Фото" width={46} height={40} loading="lazy" />}
       </label>)}
     </div>}
     {page?.older && <button type="button" className="studio-secondary" disabled={locked}
-      onClick={() => void load(page.older ?? undefined)}>Более ранние сообщения</button>}
+      onClick={() => reload(page.older ?? undefined)}>Более ранние сообщения</button>}
   </Card>;
 }
 
@@ -565,7 +570,7 @@ export function StudioAdmin({ initial }: { initial: StudioDocument }) {
   return <div className="studio-shell">
     <aside className="studio-side">
       <a href="/admin" onClick={event => { event.preventDefault(); go('settings'); }} className="studio-logo">
-        <img src="/visual/cdek-fm.svg" width="122" height="22" alt="СДЭК FM" />
+        <NextImage unoptimized loading="eager" src="/visual/cdek-fm.svg" width="122" height="22" alt="СДЭК FM" />
         <span>Редакция</span>
       </a>
       <nav className="studio-nav" aria-label="Разделы редакции">

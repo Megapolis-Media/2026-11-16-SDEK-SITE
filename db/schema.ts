@@ -49,6 +49,7 @@ export const chatModeration = sqliteTable('chat_moderation', {
 
 export const trackRequest = sqliteTable('track_request', {
   id: text('id').primaryKey(),
+  clientKey: text('client_key'),
   authorKey: text('author_key').notNull(),
   authorName: text('author_name').notNull(),
   title: text('title').notNull(),
@@ -59,6 +60,7 @@ export const trackRequest = sqliteTable('track_request', {
 }, table => [
   index('track_created').on(table.createdAt),
   index('track_author_time').on(table.authorKey, table.createdAt),
+  index('track_client_time').on(table.clientKey, table.createdAt),
 ]);
 
 export const supportTicket = sqliteTable('support_ticket', {

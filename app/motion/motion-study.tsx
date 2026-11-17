@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import NextImage from 'next/image';
 
 const variants = [
   {
@@ -56,18 +58,19 @@ const runTime = 13200;
 const lastBeat = 3;
 const clamp = (value: number, min = 0, max = lastBeat) => Math.max(min, Math.min(max, value));
 
-export function MotionStudy() {
+export function MotionStudy({ initialVariant }: { initialVariant?: string }) {
+  const preset = Math.max(0, variants.findIndex(item => item.id === initialVariant));
   const journey = useRef<HTMLDivElement>(null);
   const screen = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const monitor = useRef<HTMLVideoElement>(null);
   const scrub = useRef<HTMLInputElement>(null);
   const playback = useRef(0);
-  const selection = useRef(0);
+  const selection = useRef(preset);
   const position = useRef(0);
   const start = useRef(0);
   const scrollLength = useRef(1);
-  const [variant, setVariant] = useState(0);
+  const [variant, setVariant] = useState(preset);
   const [beat, setBeat] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [atEnd, setAtEnd] = useState(false);
@@ -92,9 +95,10 @@ export function MotionStudy() {
       return;
     }
     const initial = position.current >= 2.98 ? 0 : position.current;
-    const started = performance.now() - initial / lastBeat * runTime;
+    let started: number | undefined;
     setPlaying(true);
     function tick(now: number) {
+      started ??= now - initial / lastBeat * runTime;
       const value = clamp((now - started) / runTime * lastBeat);
       jump(value);
       if (value >= lastBeat) {
@@ -121,12 +125,6 @@ export function MotionStudy() {
     const target = canvas.current;
     if (!area || !panel || !target) return;
     const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)');
-    const id = new URLSearchParams(location.search).get('variant');
-    const preset = variants.findIndex(item => item.id === id);
-    if (preset >= 0) {
-      selection.current = preset;
-      setVariant(preset);
-    }
     let closed = false;
     let dispose: undefined | (() => void);
     let previousBeat = -1;
@@ -205,9 +203,9 @@ export function MotionStudy() {
             <div className="motion-shade" />
           </div>
           <header className="motion-header">
-            <a className="motion-logo" href="/" aria-label="CDEK FM">
-              <img src="/visual/cdek-fm.svg" alt="CDEK FM" width="104" height="19" />
-            </a>
+            <Link className="motion-logo" href="/" aria-label="CDEK FM">
+              <NextImage unoptimized loading="eager" src="/visual/cdek-fm.svg" alt="CDEK FM" width="104" height="19" />
+            </Link>
             <span className="motion-review">Арт-дирекшн</span>
             <div className="motion-variants" role="group" aria-label="Вариант 3D-переходов">
               {variants.map((item, i) =>
@@ -215,7 +213,7 @@ export function MotionStudy() {
                   <Glyph name={item.id} /><span>{item.label}</span>
                 </button>)}
             </div>
-            <a className="motion-back" href="/">Лендинг <Glyph name="arrow" /></a>
+            <Link className="motion-back" href="/">Лендинг <Glyph name="arrow" /></Link>
           </header>
           <div className="motion-copy" key={active.id + beat}>
             <h1>{first}<br /><em>{second}</em></h1>

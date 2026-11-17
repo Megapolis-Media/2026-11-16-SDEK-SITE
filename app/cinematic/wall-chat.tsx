@@ -2,8 +2,9 @@
 
 import {
   type ChangeEvent, type FormEvent, type MouseEvent, type ReactNode, type RefObject,
-  useCallback, useEffect, useId, useRef, useState,
+  useCallback, useEffect, useId, useRef, useState, useSyncExternalStore,
 } from 'react';
+import NextImage from 'next/image';
 import {
   chatClient, editorName, getNickname, maxImageBytes, maxImageEdge, messageLimit, saveNickname,
   type ChatThread, type GreetingMessage,
@@ -15,6 +16,8 @@ import { useOptionalOnAir } from './on-air';
 
 const moscow = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' });
 const moscowFull = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Moscow' });
+const subscribeNickname = () => () => {};
+const serverNickname = () => '';
 
 function AttachmentIcon({ size = 19 }: { size?: number }) {
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -84,7 +87,9 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
   const attempt = useRef('');
   const mounted = useRef(true);
   const photoUrl = useRef('');
-  const [name, setName] = useState('');
+  const storedName = useSyncExternalStore(subscribeNickname, getNickname, serverNickname);
+  const [editedName, setName] = useState<string>();
+  const name = editedName ?? storedName;
   const [body, setBody] = useState('');
   const [picture, setPicture] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
@@ -99,7 +104,6 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
 
   useEffect(() => {
     mounted.current = true;
-    setName(getNickname());
     return () => { mounted.current = false; if (photoUrl.current) URL.revokeObjectURL(photoUrl.current); };
   }, []);
   useEffect(() => {
@@ -192,6 +196,7 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
           disabled={busy} autoComplete="nickname" placeholder="Гость" />
       </label>}
     {preview && <div className="wall-attached">
+      {/* eslint-disable-next-line @next/next/no-img-element -- A browser blob preview has no intrinsic dimensions until it decodes. */}
       <img src={preview} alt="Прикреплённая картинка" />
       <button type="button" onClick={() => { resetPhoto(null); attempt.current = ''; }} disabled={blocked}>Убрать картинку</button>
     </div>}
@@ -233,7 +238,7 @@ function Message({ item, onReply, circuit, toggle, expanded }: {
     {item.parentName && <div className="wall-in-reply">В ответ {item.parentName}</div>}
     {item.body && <p className="wall-message-body">{item.body}</p>}
     {item.imageUrl && <a className="wall-message-image" href={item.imageUrl} target="_blank" rel="noopener noreferrer" aria-label="Открыть картинку в новой вкладке">
-      <img src={item.imageUrl} alt="Картинка в сообщении" width={item.imageWidth ?? undefined} height={item.imageHeight ?? undefined} loading="lazy" />
+      <NextImage unoptimized src={item.imageUrl} alt="Картинка в сообщении" width={item.imageWidth ?? maxImageEdge} height={item.imageHeight ?? maxImageEdge} loading="lazy" />
     </a>}
     <div className="wall-actions">
       <button type="button" onClick={onReply}>Ответить</button>
@@ -256,6 +261,7 @@ function Branch({ root, editorial, admin, circuit }: ThreadProps & { root: Greet
   const [expanded, setExpanded] = useState(false);
   const [target, setTarget] = useState<GreetingMessage>();
   const [items, setItems] = useState<GreetingMessage[]>([]);
+  const [loadedRevision, setLoadedRevision] = useState(moderation);
   const [older, setOlder] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -266,13 +272,12 @@ function Branch({ root, editorial, admin, circuit }: ThreadProps & { root: Greet
   const rootId = root.id;
   const saidHere = recent?.threadId === rootId ? recent : undefined;
 
-  const load = useCallback(async (before?: string, signal?: AbortSignal) => {
+  const load = useCallback((before?: string, signal?: AbortSignal) => {
     const run = ++sequence.current;
-    setLoading(true);
-    try {
-      const response = await fetch('/api/chat?thread=' + rootId + (before ? '&before=' + before : ''), { cache: 'no-store', signal });
+    return fetch('/api/chat?thread=' + rootId + (before ? '&before=' + before : ''), { cache: 'no-store', signal }).then(async response => {
       if (!response.ok) throw new Error();
-      const result: ChatThread = await response.json();
+      return await response.json() as ChatThread;
+    }).then(result => {
       if (signal?.aborted || run !== sequence.current) return;
       if (before) loadedEarlier.current = true;
       setItems(previous => {
@@ -281,21 +286,20 @@ function Branch({ root, editorial, admin, circuit }: ThreadProps & { root: Greet
           .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
       });
       if (before || !loadedEarlier.current) setOlder(result.older);
+      setLoadedRevision(moderation);
       setError(false);
-    } catch {
+    }).catch(() => {
       if (!signal?.aborted && run === sequence.current) setError(true);
-    } finally {
+    }).finally(() => {
       if (!signal?.aborted && run === sequence.current) setLoading(false);
-    }
-  }, [rootId]);
+    });
+  }, [rootId, moderation]);
 
   useEffect(() => {
     if (!expanded) return;
     if (moderation !== loadedModeration.current) {
       loadedModeration.current = moderation;
       loadedEarlier.current = false;
-      setItems([]);
-      setOlder(null);
     }
     const pull = new AbortController();
     void load(undefined, pull.signal);
@@ -308,14 +312,16 @@ function Branch({ root, editorial, admin, circuit }: ThreadProps & { root: Greet
     setAnnouncement('');
   }
 
-  const replies = saidHere && !items.some(item => item.id === saidHere.id) ? [...items, saidHere] : items;
+  const visibleItems = loadedRevision === moderation ? items : [];
+  const visibleOlder = loadedRevision === moderation ? older : null;
+  const replies = saidHere && !visibleItems.some(item => item.id === saidHere.id) ? [...visibleItems, saidHere] : visibleItems;
   return <div className="wall-thread">
     <Message item={root} circuit={circuit} onReply={() => replyTo(root)} expanded={expanded} toggle={() => {
       setExpanded(!expanded);
       if (expanded) setTarget(undefined);
     }} />
     {expanded && <div className="wall-replies" aria-label="Ветка ответов">
-      {older && <button className="wall-more" type="button" onClick={() => void load(older)} disabled={loading}>Более ранние ответы</button>}
+      {visibleOlder && <button className="wall-more" type="button" onClick={() => { setLoading(true); void load(visibleOlder); }} disabled={loading}>Более ранние ответы</button>}
       {error && <button className="wall-more" type="button" onClick={() => void load()}>Загрузить ответы ещё раз</button>}
       {loading && !replies.length && root.replyCount > 0 && <span className="wall-loading" role="status">Загружаем ответы…</span>}
       {replies.map(item => <Message item={item} circuit={circuit} key={item.id} onReply={() => replyTo(item)} />)}
@@ -379,6 +385,7 @@ export function WallChat({ editorial = false, admin = false, circuit = false, ti
       <div className="circuit-taps" />
       <div className="circuit-preview" hidden>
         <div className="circuit-preview-leader" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- The canvas projection owns this node and sets src and dimensions imperatively. */}
         <div className="circuit-preview-ticket"><img alt="" hidden /><span></span></div>
         <div className="circuit-preview-stamp" />
       </div>

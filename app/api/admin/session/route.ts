@@ -1,5 +1,5 @@
 import { chatGPTSignOutPath, getChatGPTUser } from '../../../chatgpt-auth';
-import { readBytes } from '../../../server/chat';
+import { mediaType, readBytes } from '../../../server/chat';
 import { editorFor, json, noCache, sameOrigin } from '../../../server/studio';
 import { endStudioSession, startStudioSession } from '../../../server/studio-session';
 
@@ -13,7 +13,7 @@ function redirectTo(path: string, cookie?: string) {
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return json({}, 403);
-  if (!request.headers.get('content-type')?.startsWith('application/x-www-form-urlencoded')) return json({}, 415);
+  if (mediaType(request) !== 'application/x-www-form-urlencoded') return json({}, 415);
 
   let form: URLSearchParams;
   try { form = new URLSearchParams(new TextDecoder().decode(await readBytes(request, 4096))); }

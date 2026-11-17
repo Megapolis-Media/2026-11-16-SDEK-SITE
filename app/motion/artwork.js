@@ -110,11 +110,6 @@ const roadColors = ['#08a66c', '#10cc87', '#0aa574', '#15db89', '#0da673', '#17d
 const whiteTrack = '#c0ffe3';
 const weight = (kind, a, b, u) => (a === kind ? 1 - u : 0) + (b === kind ? u : 0);
 
-function strip(scene, x, y, start, end, width, paint, alpha = 1, bias = 0) {
-  scene.fill([[x - width / 2, y, start], [x + width / 2, y, start],
-    [x + width / 2, y, end], [x - width / 2, y, end]], paint, alpha, bias);
-}
-
 function plate(scene, view, x, y, z, width, depth, paint, alpha = 1, bias = 0, style) {
   scene.panel(view, [[x - width / 2, y, z + depth / 2], [x + width / 2, y, z + depth / 2],
     [x + width / 2, y, z - depth / 2], [x - width / 2, y, z - depth / 2]], paint, alpha, bias, style);

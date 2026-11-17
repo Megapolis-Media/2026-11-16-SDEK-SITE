@@ -1,4 +1,4 @@
-import { bound, ease, lerp, mapPoints } from './projection.js';
+import { bound, ease, mapPoints } from './projection.js';
 
 const lanes = [-7.34, -5.24, -3.09, 0, 3.19, 5.32, 7.36];
 export const laneWidths = [1.45, 1.54, 1.50, 3.64, 1.51, 1.56, 1.61];

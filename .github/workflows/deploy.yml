@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Build and test image
         run: docker build --pull --tag "cdek-fm:$GITHUB_SHA" .
+      - name: Verify hardened runtime before export
+        run: bash scripts/verify-container.sh "cdek-fm:$GITHUB_SHA"
       - name: Export image
         run: docker save "cdek-fm:$GITHUB_SHA" | gzip -1 > "$RUNNER_TEMP/cdek-fm-image.tar.gz"
       - name: Deploy over restricted SSH

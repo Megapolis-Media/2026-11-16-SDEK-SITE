@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import NextImage from 'next/image';
 import { blockPresentation, dialHref, type Block, type Edition, type PublicEdition } from '../studio-config';
 import { WallChat } from './wall-chat';
 import { TrackOrder } from './track-order';
@@ -83,7 +84,7 @@ export function Site({ initial, editorial }: { initial: PublicEdition; editorial
       <header className="site-header">
         <div className="header-content">
           <a href={edition.blocks.broadcast.visible ? "#broadcast" : "#" + first} className="brand" aria-label="СДЭК">
-            <img src="/visual/cdek-mark.svg" alt="СДЭК" width="93" height="26" fetchPriority="high" />
+          <NextImage unoptimized loading="eager" src="/visual/cdek-mark.svg" alt="СДЭК" width="93" height="26" fetchPriority="high" />
           </a>
           <ContactLinks contacts={contacts} includePhone />
         </div>
@@ -147,8 +148,8 @@ export function Site({ initial, editorial }: { initial: PublicEdition; editorial
       <footer className="site-footer" data-route>
         <div className="footer-content wrap">
           {edition.tracksEnabled && !chatTarget && <TrackOrder />}
-          <a className="brand" href="#broadcast" aria-label="СДЭК"><img src="/visual/cdek-mark.svg" alt="СДЭК" width="96" height="26" loading="lazy" /></a>
-          <a className="footer-media" href="https://megapolis.media/" target="_blank" rel="noopener noreferrer"><img src="/visual/megapolis-media.webp" alt="Мегаполис Медиа" width="168" height="33" loading="lazy" /></a>
+        <a className="brand" href="#broadcast" aria-label="СДЭК"><NextImage unoptimized src="/visual/cdek-mark.svg" alt="СДЭК" width="96" height="26" loading="lazy" /></a>
+        <a className="footer-media" href="https://megapolis.media/" target="_blank" rel="noopener noreferrer"><NextImage unoptimized src="/visual/megapolis-media.webp" alt="Мегаполис Медиа" width="168" height="33" loading="lazy" /></a>
         </div>
       </footer>
       <div className="route-return" id={returnId}>
