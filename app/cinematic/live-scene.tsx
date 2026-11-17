@@ -8,7 +8,7 @@ import { useOnAir } from './on-air';
 import { chapterAt, chapters, clamp, cycleChapter, cycleLength, easeBetween, returnId, sceneAt, wrapScroll } from './scroll-route';
 
 const filters = ['hero', 'activity', 'television', 'archive', 'chat'];
-const loopExclusions = '.chat-list, .track-dialog, .player-dialog, iframe, input, select, textarea, [contenteditable]';
+const loopExclusions = '.chat-list, dialog, iframe, input, select, textarea, [contenteditable]';
 type ParcelPreview = { id: string; body: string; imageUrl?: string | null; x: number; y: number; appear: number; fold: number; fly: number; arrive: number };
 
 function scrollsSeparately(target: EventTarget | null) {

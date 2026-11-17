@@ -1,0 +1,86 @@
+.air-controls > .air-support { gap: 4px; padding-inline: 5px; }
+
+.circuit-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px var(--chat-inset, 12px);
+  border-top: 1px solid #a4f5d02b;
+}
+.site-support-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 8px;
+  color: #b7f2d9;
+  background: none;
+  border: 0;
+  font-size: 13px;
+  font-weight: 670;
+}
+.site-support-link:hover { color: #f0fff9; }
+.site-support-link svg { color: #81efc4; }
+
+.site-support-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(480px, calc(100% - 28px));
+  max-height: calc(100svh - 24px);
+  padding: clamp(14px, 4vw, 25px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: #e9fff4;
+  color-scheme: dark;
+  background: linear-gradient(140deg, #143a34, #0b252b 70%);
+  border: 1px solid #9cf4d054;
+  border-radius: 16px;
+  box-shadow: 0 23px 76px #001014bb;
+}
+.site-support-dialog::backdrop { background: #03161bcc; backdrop-filter: blur(5px); }
+.site-support-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.site-support-heading h2 { font-size: clamp(19px, 4.6vw, 24px); line-height: 1.15; letter-spacing: -.025em; }
+.site-support-mark, .site-support-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #a4f5d043;
+  border-radius: 10px;
+  color: #a4f5d2;
+  background: #1d483eaf;
+}
+.site-support-close:hover { background: #29594c; }
+.site-support-form { display: grid; gap: 15px; margin-top: 19px; }
+.site-support-form label { display: grid; gap: 7px; color: #c5ecdf; font-size: 14px; font-weight: 620; }
+.site-support-form :is(input, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #9cf4d054;
+  border-radius: 9px;
+  background: #092228;
+  color: #f2fff9;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 470;
+}
+.site-support-form textarea { resize: vertical; min-height: 106px; }
+.site-support-form :is(button, input, textarea):focus-visible, .site-support-close:focus-visible {
+  outline: 2px solid #88f3c5;
+  outline-offset: 2px;
+}
+.site-support-submit {
+  min-height: 46px;
+  padding: 9px 14px;
+  border: 1px solid #b4ffdbb0;
+  border-radius: 10px;
+  color: #082921;
+  background: linear-gradient(155deg, #7bffc5, #2ee298 73%);
+  font-size: 15px;
+  font-weight: 740;
+}
+.site-support-submit:disabled { opacity: .55; }
+.site-support-error { color: #ffd1aa; font-size: 14px; }
+.site-support-success { display: flex; align-items: center; gap: 8px; color: #aeffdb; font-weight: 660; }

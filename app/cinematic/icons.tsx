@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type IconName = 'play' | 'pause' | 'stop' | 'volume' | 'mute' | 'phone' | 'send' | 'video' | 'chat' | 'clock' | 'down' | 'loop' | 'upRight' | 'close' | 'parcel' | 'error' | 'check' | 'copy';
+export type IconName = 'play' | 'pause' | 'stop' | 'volume' | 'mute' | 'phone' | 'send' | 'video' | 'chat' | 'clock' | 'down' | 'loop' | 'upRight' | 'close' | 'parcel' | 'error' | 'check' | 'copy' | 'support';
 
 const shapes: Record<IconName, ReactNode> = {
   play: <path d="m9 5 11 7-11 7z" fill="currentColor" stroke="none" />,
@@ -21,6 +21,7 @@ const shapes: Record<IconName, ReactNode> = {
   error: <><circle cx="12" cy="12" r="8.5" /><path d="M12 8v4.8m0 3h.01" /></>,
   check: <path d="m5 12 4 4L19 6" />,
   copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 5V4H6a2 2 0 0 0-2 2v10h1" /></>,
+  support: <><path d="M4 13v-1a8 8 0 1 1 16 0v5a3 3 0 0 1-3 3h-3" /><rect x="4" y="12" width="4" height="5" rx="1.4" /><rect x="16" y="12" width="4" height="5" rx="1.4" /></>,
 };
 
 export function Icon({ name, size = 24 }: { name: IconName; size?: number }) {
