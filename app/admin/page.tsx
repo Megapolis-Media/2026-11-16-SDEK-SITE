@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { chatGPTSignInPath, chatGPTSignOutPath, getChatGPTUser } from '../chatgpt-auth';
 import { editorFor, readStudio } from '../server/studio';
 import { hasStudioSession } from '../server/studio-session';
@@ -35,10 +36,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <button className="studio-login-button" type="submit">Войти</button>
       </form>
       <div className="studio-login-links">
-        <a href="/">На сайт</a>
-        <a href={user ? chatGPTSignOutPath('/admin') : chatGPTSignInPath('/admin')} target="_top">
+        <Link href="/">На сайт</Link>
+        {process.env.CDEK_RUNTIME !== 'node' && <a href={user ? chatGPTSignOutPath('/admin') : chatGPTSignInPath('/admin')} target="_top">
           {user ? 'Сменить аккаунт ChatGPT' : 'Войти через ChatGPT'}
-        </a>
+        </a>}
       </div>
     </section>
   </main>;
