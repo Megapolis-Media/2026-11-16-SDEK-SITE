@@ -6,6 +6,7 @@ import { Icon } from './icons';
 import { GreetingLink } from './greetings';
 import { useRadio } from './use-radio';
 import { metric } from './metrika';
+import { SupportButton } from './support-dialog';
 
 type Mode = 'idle' | 'radio' | 'facecast' | 'archive';
 type StopArchive = () => void;
@@ -206,7 +207,7 @@ const radioMessages = {
   error: 'Радио недоступно. Нажмите Play для повтора.',
 } as const;
 
-export function AirDock({ chatTarget }: { chatTarget?: 'chat' | 'circuit-chat' }) {
+export function AirDock({ chatTarget, onOpenSupport }: { chatTarget?: 'chat' | 'circuit-chat'; onOpenSupport: () => void }) {
   const { radio, mode, radioEnabled, tvEnabled, startRadio, stopRadio, openFacecast, closeFacecast,
     motionReady, motionPaused, setMotionPaused } = useOnAir();
   const isFacecast = tvEnabled && mode === 'facecast';
@@ -230,6 +231,7 @@ export function AirDock({ chatTarget }: { chatTarget?: 'chat' | 'circuit-chat' }
         <Icon name={isFacecast ? 'close' : 'video'} size={19} />
         <span>{!tvEnabled ? 'Эфир выключен' : isFacecast ? 'Закрыть эфир' : 'Смотреть эфир'}</span>
       </button>
+      <SupportButton compact onClick={onOpenSupport} />
     </div>
     <div className="air-tools">
       <ParcelMeter />

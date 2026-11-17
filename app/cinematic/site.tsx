@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { blockPresentation, dialHref, type Block, type Edition, type PublicEdition } from '../studio-config';
 import { WallChat } from './wall-chat';
 import { TrackOrder } from './track-order';
@@ -10,6 +10,7 @@ import { GreetingProvider } from './greetings';
 import { AirDock, FacecastScreen, OnAirProvider, WatchBroadcast } from './on-air';
 import { LiveScene } from './live-scene';
 import { returnId } from './scroll-route';
+import { SupportButton, SupportDialog } from './support-dialog';
 import './on-air.css';
 import './chat.css';
 import './desktop.css';
@@ -29,6 +30,8 @@ function BroadcastCopy({ edition, titleId }: { edition: Edition; titleId?: strin
 
 export function Site({ initial, editorial }: { initial: PublicEdition; editorial: boolean }) {
   const [current, setCurrent] = useState(initial);
+  const supportDialog = useRef<HTMLDialogElement>(null);
+  const openSupport = () => supportDialog.current?.showModal();
   useEffect(() => {
     const abort = new AbortController();
     let pending = false;
@@ -136,7 +139,8 @@ export function Site({ initial, editorial }: { initial: PublicEdition; editorial
         {edition.blocks.archive.visible && <div className="archive-departure" aria-hidden="true" />}
         <section {...block('circuit-chat')} className="circuit-chat" aria-labelledby="circuit-chat-title">
           <span id="chat" className="chat-anchor" aria-hidden="true" />
-          <WallChat editorial={editorial} circuit title={edition.circuitTitle} />
+          <WallChat editorial={editorial} circuit title={edition.circuitTitle}
+            footer={<SupportButton onClick={openSupport} />} />
           {edition.tracksEnabled && <div className="circuit-track wrap"><TrackOrder /></div>}
         </section>
       </main>
@@ -153,7 +157,8 @@ export function Site({ initial, editorial }: { initial: PublicEdition; editorial
           <Icon name="loop" size={27} />
         </a>
       </div>
-      <AirDock chatTarget={chatTarget} />
+      <AirDock chatTarget={chatTarget} onOpenSupport={openSupport} />
+      <SupportDialog dialogRef={supportDialog} />
     </OnAirProvider>
     </GreetingProvider>
   );
