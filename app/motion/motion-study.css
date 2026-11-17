@@ -1,0 +1,269 @@
+.motion-study {
+  color-scheme: dark;
+  isolation: isolate;
+  background: #061719;
+  color: #f1fff7;
+}
+
+.motion-journey { height: 370svh; }
+.motion-screen {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: clip;
+  --art-accent: #54f9aa;
+  --art-gold: #ffad64;
+  --motion-progress: 0%;
+}
+.motion-screen[data-variant="mixer"] { --art-accent: #72f1c3; }
+.motion-screen[data-variant="tele"] { --art-accent: #ffa95c; }
+
+.motion-stage, .motion-cover, .motion-canvas, .motion-shade {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+}
+.motion-stage {
+  background:
+    radial-gradient(ellipse at 70% 44%, #163d39 0, #0a2929 29%, #071b1e 57%, #061719 82%);
+}
+.motion-cover {
+  background: url('/visual/key-visual.webp') 100% 50% / cover no-repeat;
+  mask-image: linear-gradient(90deg, transparent 39%, #000 68%);
+  opacity: .74;
+  transition: opacity .4s ease;
+}
+.motion-canvas { opacity: 0; transition: opacity .4s ease; }
+.motion-monitor-source { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.motion-stage.is-rendered .motion-cover { opacity: 0; }
+.motion-stage.is-rendered .motion-canvas { opacity: 1; }
+.motion-shade {
+  background: linear-gradient(0deg, #061719 0%, #061719a0 10%, transparent 26%),
+    linear-gradient(180deg, #061719de 0%, #06171958 12%, transparent 22%),
+    linear-gradient(90deg, #061719 0%, #061719ee 16%, #06171986 32%, transparent 58%);
+}
+
+.motion-header {
+  z-index: 2;
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  height: 88px;
+  padding-inline: clamp(21px, 4.1vw, 73px);
+  border-bottom: 1px solid #b4ffd91d;
+}
+.motion-logo img { width: clamp(90px, 8.15vw, 128px); height: auto; }
+.motion-review {
+  font-size: 12px;
+  line-height: 1.2;
+  color: #9fbdb3;
+  padding-left: 15px;
+  border-left: 1px solid #beffdc33;
+  white-space: nowrap;
+}
+.motion-variants {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid #c6ffdf29;
+  border-radius: 12px;
+  background: #0b2627ca;
+  backdrop-filter: blur(12px);
+}
+.motion-variants button {
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #a8c5bb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 620;
+  transition: color .2s, background .2s, border-color .2s;
+}
+.motion-variants button:hover { color: #e8fff3; }
+.motion-variants button[aria-pressed="true"] {
+  border-color: #aeffdc43;
+  background: #224b42;
+  color: #e9fff4;
+}
+.motion-variants button[aria-pressed="true"] svg { color: var(--art-accent); }
+.motion-back {
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c4d8d1;
+}
+.motion-back:hover { color: var(--art-accent); }
+.motion-back svg { width: 14px; height: 14px; }
+
+.motion-copy {
+  z-index: 1;
+  position: absolute;
+  left: clamp(29px, 6.15vw, 114px);
+  top: 50%;
+  transform: translateY(-45%);
+  max-width: min(39vw, 640px);
+  padding-bottom: 3px;
+  animation: motion-copy-in .35s cubic-bezier(.17,.75,.27,1) both;
+}
+.motion-copy h1 {
+  font-size: clamp(53px, 6.1vw, 111px);
+  font-weight: 780;
+  line-height: .98;
+  letter-spacing: -.073em;
+}
+.motion-copy h1 em { color: var(--art-accent); font-weight: 780; }
+.motion-copy p {
+  color: #b8d0c7;
+  margin-top: clamp(18px, 3vh, 31px);
+  max-width: 320px;
+  font-size: clamp(15px, 1.23vw, 19px);
+  font-weight: 480;
+  line-height: 1.54;
+  letter-spacing: -.018em;
+}
+@keyframes motion-copy-in {
+  from { opacity: 0; translate: 0 9px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+.motion-bottom {
+  position: absolute;
+  inset: auto clamp(29px, 6.15vw, 114px) clamp(23px, 5.1vh, 52px);
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr);
+  align-items: end;
+  gap: clamp(21px, 5vw, 89px);
+  z-index: 2;
+}
+.motion-play {
+  min-width: 172px;
+  border: 1px solid #a3ffce59;
+  border-radius: 10px;
+  background: #0b302bd6;
+  color: #e4fff1;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  height: 46px;
+  padding: 0 15px 0 12px;
+  font-size: 13px;
+  font-weight: 660;
+  white-space: nowrap;
+}
+.motion-play svg { color: var(--art-accent); }
+.motion-play:hover { background: #184a3d; }
+.motion-timeline { position: relative; }
+.motion-scrub {
+  width: 100%;
+  margin: 0;
+  height: 22px;
+  display: block;
+  appearance: none;
+  cursor: ew-resize;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--art-accent);
+}
+.motion-scrub::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, currentColor var(--motion-progress), #74998d54 var(--motion-progress));
+}
+.motion-scrub::-moz-range-track {
+  height: 3px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, currentColor var(--motion-progress), #74998d54 var(--motion-progress));
+}
+.motion-scrub::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: 1px solid #e6fff5;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 14px #44faae8a;
+}
+.motion-scrub::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #e6fff5;
+  border-radius: 50%;
+  background: currentColor;
+}
+.motion-stops {
+  position: relative;
+  height: 25px;
+}
+.motion-stops button {
+  position: absolute;
+  top: 0;
+  min-height: 25px;
+  border: 0;
+  background: transparent;
+  color: #b0c9bf;
+  font-size: 13px;
+  font-weight: 560;
+  padding: 3px 0 0;
+  white-space: nowrap;
+}
+.motion-stops button:nth-child(1) { left: 0; }
+.motion-stops button:nth-child(2) { left: 33.333%; transform: translateX(-50%); }
+.motion-stops button:nth-child(3) { left: 66.666%; transform: translateX(-50%); }
+.motion-stops button:nth-child(4) { right: 0; }
+.motion-stops button[aria-current], .motion-stops button:hover { color: var(--art-accent); }
+.motion-scrub:focus-visible { outline: 2px solid var(--art-accent); outline-offset: 1px; }
+
+@media (max-width: 840px) {
+  .motion-header { grid-template-columns: auto 1fr auto; gap: 10px; padding-inline: 22px; }
+  .motion-review { display: none; }
+  .motion-variants { justify-self: center; }
+  .motion-variants button { padding-inline: 9px; }
+  .motion-copy { max-width: 48vw; }
+  .motion-copy h1 { font-size: clamp(45px, 7.4vw, 70px); }
+}
+@media (max-width: 620px) {
+  .motion-header { grid-template-columns: auto 1fr auto; padding: 0 17px 10px; grid-template-rows: 49px 40px; height: 103px; gap: 2px 10px; }
+  .motion-logo img { width: 94px; }
+  .motion-review { display: block; padding-left: 9px; font-size: 10px; }
+  .motion-back { grid-column: 3; grid-row: 1; font-size: 11px; }
+  .motion-back svg { width: 11px; height: 11px; }
+  .motion-variants { grid-column: 1 / -1; grid-row: 2; width: 100%; padding: 3px; gap: 3px; }
+  .motion-variants button { flex: 1 1 0; min-height: 31px; padding: 0 5px; gap: 5px; font-size: 11px; }
+  .motion-variants button svg { width: 14px; height: 14px; }
+  .motion-copy { left: 22px; right: 22px; top: auto; bottom: clamp(103px, 15.6vh, 147px); transform: none; max-width: 100%; }
+  .motion-copy h1 { font-size: clamp(41px, 10.9vw, 66px); }
+  .motion-copy p { margin-top: 12px; max-width: 280px; font-size: 13px; line-height: 1.42; }
+  .motion-shade {
+    background: linear-gradient(0deg, #061719 0%, #061719f4 20%, #061719b7 33%, transparent 55%),
+      linear-gradient(180deg, #061719e0 0%, #06171940 18%, transparent 33%);
+  }
+  .motion-cover { background-position: 79% 0; background-size: auto 66%; mask-image: linear-gradient(0deg,transparent 38%,#000 73%); }
+  .motion-bottom { left: 20px; right: 20px; bottom: max(17px, env(safe-area-inset-bottom)); gap: 11px; grid-template-columns: auto minmax(0, 1fr); }
+  .motion-play { height: 37px; width: 37px; min-width: 37px; border-radius: 8px; padding: 0; }
+  .motion-play span { display: none; }
+  .motion-stops button { font-size: 10px; min-height: 18px; padding-top: 1px; }
+  .motion-stops { height: 18px; }
+}
+@media (max-width: 620px) and (max-height: 650px) {
+  .motion-copy { bottom: 73px; }
+  .motion-copy h1 { font-size: clamp(33px, 9.4vw, 49px); }
+  .motion-copy p { margin-top: 7px; font-size: 11px; }
+}
