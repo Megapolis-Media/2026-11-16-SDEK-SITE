@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { uuid } from '../../../chat-types';
 import { listMessages, messageById, readBytes } from '../../../server/chat';
 import { isEditor, json, sameOrigin } from '../../../server/studio';
+import { withApiErrors } from '../../../server/api-errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ const removal = z.union([
   z.object({ ids: z.array(z.string().regex(uuid)).min(1) }).strict(),
 ]);
 
-export async function GET(request: Request) {
+async function readModeration(request: Request) {
   if (!sameOrigin(request) || !await isEditor()) return json({ error: 'Нужен доступ редакции.' }, 403);
   if (!env.DB) return json({ error: 'Чат временно недоступен.' }, 503);
   const before = new URL(request.url).searchParams.get('before');
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
   return json({ ...page, messages: page.messages.reverse() });
 }
 
-export async function DELETE(request: Request) {
+async function removeMessages(request: Request) {
   if (!sameOrigin(request) || !await isEditor()) return json({ error: 'Нужен доступ редакции.' }, 403);
   const { DB: db, BUCKET: bucket } = env;
   if (!db) return json({ error: 'Чат временно недоступен.' }, 503);
@@ -59,3 +60,6 @@ export async function DELETE(request: Request) {
   } else attachmentsRemoved = attachments.length === 0;
   return json({ deleted: deleted.results.length, attachmentsRemoved });
 }
+
+export const GET = withApiErrors(readModeration, 'Не удалось загрузить сообщения. Попробуйте ещё раз.');
+export const DELETE = withApiErrors(removeMessages, 'Не удалось удалить сообщения. Попробуйте ещё раз.');

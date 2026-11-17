@@ -2,10 +2,11 @@ import { env } from 'cloudflare:workers';
 import { isEditor, json, readStudio, sameOrigin } from '../../../server/studio';
 import { readBytes } from '../../../server/chat';
 import { studioSchema } from '../../../studio-config';
+import { withApiErrors } from '../../../server/api-errors';
 
 export const dynamic = 'force-dynamic';
 
-export async function PUT(request: Request) {
+async function saveSettings(request: Request) {
   if (!sameOrigin(request) || !await isEditor()) return json({ error: 'Нужен доступ редакции.' }, 403);
   if (!env.DB) return json({ error: 'Хранилище недоступно.' }, 503);
   if (!request.headers.get('content-type')?.startsWith('application/json')) return json({}, 415);
@@ -31,3 +32,5 @@ export async function PUT(request: Request) {
   if (!saved) return json({ error: 'Настройки уже изменились. Обновите страницу, чтобы увидеть опубликованный вариант.', current: await readStudio() }, 409);
   return json({ studio: parsed.data, revision: saved.revision, updatedAt });
 }
+
+export const PUT = withApiErrors(saveSettings, 'Не удалось сохранить настройки. Попробуйте ещё раз.');

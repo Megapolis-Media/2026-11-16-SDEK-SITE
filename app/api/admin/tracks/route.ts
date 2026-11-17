@@ -2,10 +2,11 @@ import { env } from 'cloudflare:workers';
 import { uuid } from '../../../chat-types';
 import { readBytes } from '../../../server/chat';
 import { isEditor, json, sameOrigin } from '../../../server/studio';
+import { withApiErrors } from '../../../server/api-errors';
 
 export const dynamic = 'force-dynamic';
 
-export async function PATCH(request: Request) {
+async function acceptTrack(request: Request) {
   if (!sameOrigin(request) || !(await isEditor())) return json({}, 403);
   if (!env.DB) return json({}, 503);
   let data: { id?: unknown; accepted?: unknown };
@@ -16,3 +17,5 @@ export async function PATCH(request: Request) {
     .bind(data.accepted ? Date.now() : null, data.id).first();
   return updated ? json(updated) : json({}, 404);
 }
+
+export const PATCH = withApiErrors(acceptTrack, 'Не удалось сохранить заявку. Попробуйте ещё раз.');

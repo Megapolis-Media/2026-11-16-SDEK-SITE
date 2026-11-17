@@ -2,10 +2,11 @@ import { env } from 'cloudflare:workers';
 import { uuid } from '../../chat-types';
 import { cleanText, readBytes, visitor } from '../../server/chat';
 import { json, publicEdition, readStudio, sameOrigin } from '../../server/studio';
+import { withApiErrors } from '../../server/api-errors';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+async function requestTrack(request: Request) {
   const db = env.DB;
   if (!db) return json({ error: 'Заявки временно недоступны' }, 503);
   if (!sameOrigin(request)) return json({}, 403);
@@ -35,3 +36,5 @@ export async function POST(request: Request) {
   if (inserted) return json({ id: payload.id }, 201);
   return (await duplicate()) ? json({ id: payload.id }) : json({ error: 'Попробуйте чуть позже' }, 429);
 }
+
+export const POST = withApiErrors(requestTrack, 'Заявки временно недоступны. Попробуйте ещё раз.');
