@@ -60,3 +60,18 @@ Thumbs.db
 
 # Ready site assets (e.g. public/assets and src/assets) remain tracked.
 # Do not add blanket image ignores such as *.png, *.jpg or *.svg.
+
+# CDEK FM local framework state, credentials and exports.
+/.wrangler/
+/.vinext/
+/.sites-runtime/
+/out/
+/outputs/
+/.agents/
+/.codex/
+/client-data/
+next-env.d.ts
+*.tsbuildinfo
+.dev.vars
+.dev.vars.*
+.envrc
