@@ -1,6 +1,16 @@
 .studio-support-hub p { margin-top: 12px; max-width: 80ch; line-height: 1.5; }
 .studio-support-open { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 16px; text-decoration: none; }
 .studio-support-archive { margin-top: 20px; }
+.studio-support-central { margin-top: 16px; }
+.studio-support-central > .studio-note, .studio-support-central > .studio-error { margin-top: 12px; }
+.studio-support-sender { margin-block: 8px; overflow-wrap: anywhere; font-size: 14px; }
+.studio-support-status { padding: 5px 9px; border-radius: 6px; font-size: 12px; font-weight: 650; }
+.studio-support-status[data-status='NEW'] { color: #714a09; background: #fff0c9; }
+.studio-support-status[data-status='IN_PROGRESS'] { color: #15517b; background: #e0f0fc; }
+.studio-support-status[data-status='CLOSED'] { color: #145a3a; background: #e1f8eb; }
+.studio-support-ticket-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--studio-accent); text-decoration: underline; }
+.studio-support-central .studio-support-description { font-weight: 650; }
+.studio-support-central button:disabled { opacity: .55; }
 .studio-support-archive > summary { min-height: 44px; padding-block: 12px; cursor: pointer; font-weight: 650; }
 .studio-support-archive[open] > summary { margin-bottom: 8px; }
 .studio-support-archive .studio-support-layout { margin-top: 14px; }

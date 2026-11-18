@@ -7,6 +7,7 @@ import { database, migrate } from '../server/storage.mjs';
 import { env, withRequest } from './server-fixture.mjs';
 import * as route from '../app/support-api/[...path]/route.ts';
 import { GET as proof } from '../app/.well-known/support-bridge.json/route.ts';
+import { GET as centralInbox } from '../app/api/admin/support/central/route.ts';
 
 mkdirSync('work', { recursive: true });
 process.env.CDEK_DATA_DIR = mkdtempSync(path.resolve('work/bridge-test-'));
@@ -54,6 +55,66 @@ beforeEach(() => {
   };
 });
 after(() => { globalThis.fetch = realFetch; database().close(); });
+
+function adminCall(query = '', authenticated = true) {
+  const request = new Request('https://cdek-fm.test/api/admin/support/central' + query, {
+    headers: authenticated ? { cookie: '__Host-cdek-studio=' + 'a'.repeat(43) } : {},
+  });
+  return withRequest(request, centralInbox);
+}
+
+function editorSession() {
+  env.CDEK_ADMIN_PASSWORD_HASH = 'fixture-verifier';
+  database().prepare('INSERT OR REPLACE INTO studio_session(token_hash,password_version,expires_at) VALUES(?,?,?)')
+    .run(createHash('sha256').update('a'.repeat(43)).digest('hex'),
+      createHash('sha256').update('fixture-verifier').digest('hex'), Date.now() + 60_000);
+}
+
+test('site-wide ticket metadata requires editorial auth before any upstream call', async () => {
+  const response = await adminCall('', false);
+  assert.equal(response.status, 403);
+  assert.equal(requests.length, 0);
+  editorSession();
+  for (const query of ['?status=anything', '?before=0', '?before=1%26origin%3Devil']) {
+    assert.equal((await adminCall(query)).status, 400);
+  }
+  assert.equal(requests.length, 0);
+});
+
+test('editorial proxy scopes to configured origin, strips extra data and includes closed records', async () => {
+  editorSession();
+  const record = { ...ticket, status: 'CLOSED', visitorName: 'Посетитель', createdAt: message.createdAt,
+    takenAt: null, closedAt: message.createdAt, visitorToken: token, privateNotes: 'Internal' };
+  respond = () => Response.json({ tickets: [record], hasMore: true, nextCursor: 1, apiKey: key });
+  const response = await adminCall('?status=CLOSED&before=2&origin=https://evil.test');
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('cache-control'), /no-store/);
+  const result = await response.json();
+  assert.equal(result.tickets[0].status, 'CLOSED');
+  assert.equal(result.tickets[0].visitorName, record.visitorName);
+  const serialized = JSON.stringify(result);
+  assert.ok(!serialized.includes(key) && !serialized.includes(token) && !serialized.includes('privateNotes'));
+  assert.equal(requests.length, 1);
+  const url = new URL(requests[0].url);
+  assert.equal(url.pathname, '/websites/api/v1/site/tickets');
+  assert.equal(url.searchParams.get('status'), 'CLOSED');
+  assert.equal(url.searchParams.get('before'), '2');
+  assert.equal(url.searchParams.get('limit'), '30');
+  assert.equal(url.searchParams.has('origin'), false);
+  assert.equal(requests[0].options.headers['X-Support-Session'], undefined);
+  await adminCall();
+  assert.equal(new URL(requests[1].url).search, '?limit=30');
+});
+
+test('editorial proxy reports upstream failures and malformed data without claiming an empty inbox', async () => {
+  editorSession();
+  respond = () => Response.json({ error: key, code: 'INTEGRATION_UNAUTHORIZED' }, { status: 401 });
+  const unavailable = await adminCall();
+  assert.equal(unavailable.status, 502);
+  assert.ok(!(await unavailable.text()).includes(key));
+  respond = () => Response.json({ tickets: [{ ...ticket, status: 'UNKNOWN' }], hasMore: false, nextCursor: null });
+  assert.equal((await adminCall()).status, 502);
+});
 
 test('bridge rejects unconfigured keys and never exposes credentials', async () => {
   delete env.CDEK_SUPPORT_PLATFORM_KEY;
