@@ -18,6 +18,24 @@ type Change = { action: 'status' } & Pick<SupportTicket, 'id' | 'status' | 'upda
   | { action: 'retry'; id: string };
 
 export function SupportInbox() {
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  return <section aria-labelledby="studio-support-title">
+    <header className="studio-page-title"><h1 id="studio-support-title">Техническая поддержка</h1></header>
+    <section className="studio-card studio-support-hub" aria-labelledby="studio-support-central-title">
+      <h2 id="studio-support-central-title">Обращения в центральной поддержке</h2>
+      <p>Новые заявки с CDEK FM и переписка с посетителями находятся в единой поддержке сайтов Мегаполис Медиа.</p>
+      <a className="studio-publish studio-support-open" href="https://help.megapolis.media/websites/support"
+        target="_blank" rel="noopener noreferrer">Открыть поддержку сайтов <span aria-hidden="true">↗</span></a>
+      <p className="studio-note">Откроется новая вкладка. Войдите под учётной записью сотрудника поддержки и выберите домен cdek-fm.ru.</p>
+    </section>
+    <details className="studio-support-archive" open={archiveOpen} onToggle={event => setArchiveOpen(event.currentTarget.open)}>
+      <summary>Локальный архив заявок</summary>
+      {archiveOpen && <LocalSupportArchive />}
+    </details>
+  </section>;
+}
+
+function LocalSupportArchive() {
   const [page, setPage] = useState<SupportInboxPage | null>(null);
   const [draftEmail, setDraftEmail] = useState<string | null>(null);
   const [filter, setFilter] = useState<SupportStatus | ''>('');
@@ -85,13 +103,13 @@ export function SupportInbox() {
 
   const settings = page?.settings;
   const email = draftEmail ?? settings?.email ?? '';
-  return <section aria-labelledby="studio-support-title">
-    <header className="studio-page-title"><h1 id="studio-support-title">Техническая поддержка</h1></header>
+  return <section aria-label="Локальный архив заявок">
+    <p className="studio-note">Здесь сохранены обращения прежней локальной формы. Новые заявки и ответы операторов доступны по ссылке в центральной поддержке выше.</p>
     {notice && <p className={'studio-status-message' + (notice.error ? ' studio-error' : '')} role="status">{notice.text}</p>}
     <div className="studio-support-layout">
       <section className="studio-card" aria-labelledby="studio-support-feed-title">
         <div className="studio-support-toolbar">
-          <h2 id="studio-support-feed-title">Заявки</h2>
+          <h2 id="studio-support-feed-title">Заявки локального архива</h2>
           <label className="studio-field"><span>Статус заявок</span>
             <select value={filter} disabled={busy} onChange={event => {
               setPage(null);
@@ -108,7 +126,7 @@ export function SupportInbox() {
         </div>
         {feedError && <p className="studio-note" role="alert">{feedError}</p>}
         {!page && !feedError && <p className="studio-note" role="status">Загружаем заявки…</p>}
-        {page?.tickets.length === 0 && <p className="studio-note">В этой ленте пока нет заявок.</p>}
+        {page?.tickets.length === 0 && <p className="studio-note">Локальных заявок с выбранным статусом нет. Новые обращения находятся в центральной поддержке.</p>}
         <div className="studio-support-feed">
           {page?.tickets.map(ticket => {
             const canRetry = ticket.deliveries.some(delivery => delivery.state !== 'sent' &&
@@ -153,7 +171,8 @@ export function SupportInbox() {
         </nav>}
       </section>
       <section className="studio-card" aria-labelledby="studio-support-delivery-title">
-        <h2 id="studio-support-delivery-title">Доставка заявок</h2>
+        <h2 id="studio-support-delivery-title">Доставка локальных заявок</h2>
+        <p className="studio-note">Эти настройки относятся только к прежней локальной очереди. Подключение центральной поддержки настраивается отдельно.</p>
         <form className="studio-support-settings" onSubmit={event => { event.preventDefault(); void update({ action: 'email', email: email.trim() }); }}>
           <label className="studio-field"><span>Куда отправлять копии</span>
             <input type="email" autoComplete="off" maxLength={254} placeholder="support@example.com" value={email}
