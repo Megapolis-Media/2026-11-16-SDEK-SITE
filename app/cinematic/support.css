@@ -111,7 +111,6 @@
 .site-support-composer textarea { min-height: 64px; max-height: 120px; resize: none; font-size: 16px; line-height: 1.4; }
 .site-support-composer textarea::placeholder { color: #a4cabb; opacity: 1; }
 .site-support-composer .site-support-submit { display: grid; place-items: center; width: 46px; height: 46px; padding: 0; margin-bottom: 9px; }
-.site-support-composer-hint { grid-column: 1 / -1; color: #a4cabb; font-size: 11px; }
 .site-support-closed { flex: none; padding: 16px 20px; color: #c5ecdf; font-size: 13px; line-height: 1.5; }
 
 @media (max-width: 600px) {
@@ -122,6 +121,5 @@
   .site-support-composer { padding: 12px 14px 6px; }
   .site-support-intake { padding: 16px 14px; }
   .site-support-message { max-width: 90%; }
-  .site-support-composer-hint { display: none; }
   .site-support-composer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }

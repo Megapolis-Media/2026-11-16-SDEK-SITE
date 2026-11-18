@@ -221,7 +221,6 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
         <button className="site-support-submit" disabled={busy || !message.trim()} aria-label={busy ? 'Отправляем сообщение' : 'Отправить сообщение'}>
           <Icon name="send" size={21} />
         </button>
-        <span className="site-support-composer-hint">{busy ? 'Отправляем…' : 'Enter — отправить · Shift + Enter — новая строка'}</span>
       </form> : <p className="site-support-closed">Обращение закрыто. Переписка сохранена — вы можете создать новое обращение.</p>}
     </div>}
     </>}
