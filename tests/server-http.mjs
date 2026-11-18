@@ -67,6 +67,7 @@ try {
   check(bridgeIdentity.origin, 'https://cdek-fm.test', 'bridge canonical origin');
   check((await request('/.well-known/support-bridge.json?challenge=bad')).status, 400, 'invalid bridge challenge');
   check((await request('/support-api/session')).status, 401, 'anonymous support session');
+  check((await request('/api/admin/support/central')).status, 403, 'anonymous central support inbox');
   check((await json('/support-api/session', { name: 'Test', externalUserId: 'spoofed' })).status, 400, 'support cannot impersonate an account');
   check((await json('/support-api/session', { name: 'Test' }, { headers: { origin: 'https://other.test' } })).status, 403, 'support bridge origin guard');
   for (const url of ['/', '/admin', '/api/site-settings', '/api/chat', '/visual/cdek-fm.svg']) check((await request(url)).status, 200, url);

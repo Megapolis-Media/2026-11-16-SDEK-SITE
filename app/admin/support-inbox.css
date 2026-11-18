@@ -1,33 +1,23 @@
-.studio-support-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 2.1fr) minmax(250px, 1fr);
-  gap: 14px;
-  align-items: start;
-}
+.studio-support-hub p { margin-top: 12px; max-width: 80ch; line-height: 1.5; }
+.studio-support-open { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 16px; text-decoration: none; }
+.studio-support-central { margin-top: 16px; }
+.studio-support-central > .studio-note, .studio-support-central > .studio-error { margin-top: 12px; }
+.studio-support-sender { margin-block: 8px; overflow-wrap: anywhere; font-size: 14px; }
+.studio-support-status { padding: 5px 9px; border-radius: 6px; font-size: 12px; font-weight: 650; }
+.studio-support-status[data-status='NEW'] { color: #714a09; background: #fff0c9; }
+.studio-support-status[data-status='IN_PROGRESS'] { color: #15517b; background: #e0f0fc; }
+.studio-support-status[data-status='CLOSED'] { color: #145a3a; background: #e1f8eb; }
+.studio-support-ticket-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--studio-accent); text-decoration: underline; }
+.studio-support-central .studio-support-description { font-weight: 650; }
+.studio-support-central button:disabled { opacity: .55; }
 .studio-support-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
 .studio-support-toolbar h2 { margin-inline-end: auto; align-self: center; }
 .studio-support-feed { display: grid; gap: 10px; }
-.studio-support-feed:not(:empty), .studio-support-settings { margin-top: 14px; }
+.studio-support-feed:not(:empty) { margin-top: 14px; }
 .studio-support-ticket { padding: 13px; border: 1px solid var(--studio-line); border-radius: 9px; background: #f7faf7; }
 .studio-support-ticket header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 5px 10px; }
 .studio-support-ticket h3 { font-size: 15px; font-weight: 720; }
 .studio-support-ticket time { font-size: 12px; color: var(--studio-muted); }
-.studio-support-address { display: inline-block; margin-top: 5px; color: var(--studio-accent); text-decoration: underline; }
 .studio-support-description { margin-top: 9px; white-space: pre-wrap; line-height: 1.5; }
-.studio-support-address, .studio-support-description { overflow-wrap: anywhere; font-size: 14px; }
-.studio-support-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 9px; margin-top: 13px; }
-.studio-support-deliveries { display: flex; flex-wrap: wrap; gap: 5px; align-self: center; }
-.studio-support-deliveries span { padding: 4px 7px; color: var(--studio-muted-strong); background: #e9f0ea; border-radius: 5px; font-size: 11px; }
-.studio-support-deliveries [data-state='sent'] { color: #145a3a; background: #e1f8eb; }
-.studio-support-deliveries [data-state='failed'] { color: #8f3434; background: #fbe7e5; }
-.studio-support-settings { display: grid; gap: 8px; }
-.studio-support-settings button { justify-self: start; }
-.studio-support-connections { display: grid; gap: 8px; margin-top: 15px; color: var(--studio-muted); font-size: 12px; }
-.studio-support-connections div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px 10px; }
-.studio-support-connections dd { color: var(--studio-muted-strong); font-weight: 650; }
+.studio-support-description { overflow-wrap: anywhere; font-size: 14px; }
 .studio-support-pagination { display: flex; justify-content: space-between; gap: 8px; margin-top: 11px; }
-.studio-support-layout button:disabled:not(.studio-publish) { opacity: .55; }
-
-@media (max-width: 960px) {
-  .studio-support-layout { grid-template-columns: minmax(0, 1fr); }
-}

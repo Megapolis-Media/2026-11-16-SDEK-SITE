@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { isEditor, json, sameOrigin } from './studio';
 import { readSupportBody } from './support';
+import { centralStatuses } from '../central-support-types';
 
 const cookieName = '__Host-cdek-support';
 const secret = z.string().regex(/^[A-Za-z0-9_-]{20,512}$/);
@@ -34,7 +35,7 @@ async function upstream(path: string, method = 'GET', body?: object, token?: str
   const config = configuration();
   let response: Response;
   try {
-    response = await fetch(config.base + path, { method, redirect: 'error', signal: AbortSignal.timeout(10_000),
+    response = await fetch(config.base + path, { method, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10_000),
       headers: { authorization: 'Bearer ' + config.key, 'X-Support-Origin': config.origin, accept: 'application/json',
         ...(body ? { 'content-type': 'application/json' } : {}), ...(token ? { 'X-Support-Session': token } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -89,6 +90,32 @@ function received<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
   if (!result.success) throw new BridgeError(502, 'Поддержка вернула некорректные данные. Повторите попытку.');
   return result.data;
+}
+
+// Site-wide metadata is available only to the CDEK editorial session. Never use
+// a visitor's cookie here or accept an origin, key or URL from the browser.
+export async function centralSupportInbox(request: Request) {
+  try {
+    if (!await isEditor()) return json({ error: 'Нужен доступ редакции.' }, 403);
+    const params = new URL(request.url).searchParams;
+    const query = z.object({ status: z.enum(centralStatuses).optional(),
+      before: z.string().regex(/^[1-9]\d{0,14}$/).optional() }).safeParse({
+      status: params.get('status') ?? undefined, before: params.get('before') ?? undefined,
+    });
+    if (!query.success) return json({ error: 'Проверьте фильтр.' }, 400);
+    const search = new URLSearchParams({ limit: '30' });
+    if (query.data.status) search.set('status', query.data.status);
+    if (query.data.before) search.set('before', query.data.before);
+    const schema = z.object({ tickets: z.array(z.object({
+      id: z.number().int().positive().safe(), ticketId: z.string().max(80),
+      subject: z.string().max(240), visitorName: z.string().max(120), status: z.enum(centralStatuses),
+      createdAt: z.iso.datetime(), takenAt: z.iso.datetime().nullable(), closedAt: z.iso.datetime().nullable(),
+    })).max(30), hasMore: z.boolean(), nextCursor: z.number().int().positive().safe().nullable() });
+    return json(received(schema, await upstream('/site/tickets?' + search)));
+  } catch (error) {
+    return json({ error: error instanceof BridgeError ? error.message : 'Не удалось загрузить заявки поддержки.' },
+      error instanceof BridgeError ? error.status : 502);
+  }
 }
 
 async function limit(key: string, maximum: number) {
