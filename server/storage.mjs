@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
+import { chmodSync, mkdirSync, readFileSync, readdirSync, lstatSync, statfsSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const stateKey = Symbol.for('cdek-fm.sqlite');
@@ -99,14 +99,74 @@ function objectPath(key) {
   return path.join(directory, createHash('sha256').update(key).digest('hex'));
 }
 
-export const localBucket = {
+export const photoStorageQuotaBytes = 20 * 1024 ** 3;
+
+// Serialize file changes with SQLite's writer lock, including other processes.
+// Synchronous filesystem operations prevent other requests joining this transaction.
+// Reconcile existing, temporary and orphaned files after restart or an error.
+export function createLocalBucket({ quotaBytes = photoStorageQuotaBytes, minimumFreeBytes = 1024 ** 3,
+  diskStat = statfsSync } = {}) {
+  let reconciled = false;
+  function mutate(change) {
+    const directory = path.dirname(objectPath(''));
+    const db = database();
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      if (!reconciled) {
+        let bytes = 0;
+        for (const entry of readdirSync(directory)) {
+          const info = lstatSync(path.join(directory, entry));
+          if (!info.isFile()) throw new Error('Unexpected entry in upload storage');
+          bytes += info.size;
+        }
+        db.prepare('INSERT INTO local_upload_usage (id, bytes) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET bytes = excluded.bytes').run(bytes);
+      }
+      const used = db.prepare('SELECT bytes FROM local_upload_usage WHERE id = 1').get().bytes;
+      const next = change({ directory, used });
+      db.prepare('UPDATE local_upload_usage SET bytes = ? WHERE id = 1').run(next);
+      db.exec('COMMIT');
+      reconciled = true;
+    } catch (error) {
+      if (error.code === 'CDEK_PHOTO_STORAGE_FULL') {
+        // Validation failed before touching files; retain the reconciled count
+        // so repeated rejected uploads don't rescan the entire directory.
+        db.exec('COMMIT');
+        reconciled = true;
+        throw error;
+      }
+      reconciled = false;
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+  function size(filename) {
+    try {
+      const info = lstatSync(filename);
+      if (!info.isFile()) throw new Error('Unexpected upload file type');
+      return info.size;
+    } catch (error) { if (error.code === 'ENOENT') return 0; throw error; }
+  }
+  function full() {
+    return Object.assign(new Error('Photo storage quota or free disk reserve reached'), { code: 'CDEK_PHOTO_STORAGE_FULL' });
+  }
+  return {
   async put(key, value) {
     const filename = objectPath(key);
     const temporary = `${filename}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporary, Buffer.from(value), { mode: 0o600, flag: 'wx' });
-      await rename(temporary, filename);
-    } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
+    const bytes = Buffer.from(value);
+    mutate(({ directory, used }) => {
+      const delta = bytes.length - size(filename);
+      if (delta > 0 && delta > quotaBytes - used) throw full();
+      const disk = diskStat(directory);
+      if (disk.bavail * disk.bsize - bytes.length < minimumFreeBytes) throw full();
+      try {
+        writeFileSync(temporary, bytes, { mode: 0o600, flag: 'wx' });
+        renameSync(temporary, filename);
+      } finally {
+        try { unlinkSync(temporary); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      }
+      return used + delta;
+    });
   },
   async get(key) {
     let bytes;
@@ -116,8 +176,18 @@ export const localBucket = {
       httpEtag: '"' + createHash('sha256').update(bytes).digest('hex') + '"' };
   },
   async delete(keys) {
-    for (const key of Array.isArray(keys) ? keys : [keys]) {
-      await unlink(objectPath(key)).catch(error => { if (error.code !== 'ENOENT') throw error; });
-    }
+    mutate(({ used }) => {
+      let removed = 0;
+      for (const key of Array.isArray(keys) ? keys : [keys]) {
+        const filename = objectPath(key);
+        const bytes = size(filename);
+        try { unlinkSync(filename); removed += bytes; }
+        catch (error) { if (error.code !== 'ENOENT') throw error; }
+      }
+      return Math.max(0, used - removed);
+    });
   },
-};
+  };
+}
+
+export const localBucket = createLocalBucket();

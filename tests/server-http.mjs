@@ -18,6 +18,7 @@ cpSync('dist/standalone', runtime, { recursive: true });
 for (const directory of ['server', 'drizzle']) cpSync(directory, path.join(runtime, directory), { recursive: true });
 mkdirSync(path.join(runtime, 'scripts'));
 cpSync('scripts/server.mjs', path.join(runtime, 'scripts/server.mjs'));
+cpSync('scripts/register-support.mjs', path.join(runtime, 'scripts/register-support.mjs'));
 process.env.CDEK_DATA_DIR = path.join(runtime, 'data');
 for (const dependency of ['eslint', 'typescript', 'drizzle-kit', 'wrangler', '@cloudflare/vite-plugin', 'vite']) {
   assert.ok(!existsSync(path.join(runtime, 'node_modules', dependency)), 'Build tool leaked into runtime: ' + dependency);
@@ -31,6 +32,8 @@ await new Promise(resolve => reservation.close(resolve));
 const password = randomUUID();
 const salt = Buffer.alloc(16, 23);
 const env = { ...process.env, NODE_ENV: 'production', HOST: '127.0.0.1', PORT: String(port), CDEK_RUNTIME: 'node', CDEK_EDITOR_EMAILS: '',
+  CDEK_SUPPORT_PLATFORM_URL: 'https://support.test/websites/api/v1',
+  CDEK_SUPPORT_PLATFORM_KEY: 'sw_live_http_fixture_not_a_real_secret_0123456789', CDEK_SUPPORT_SITE_ORIGIN: 'https://cdek-fm.test',
   VINEXT_TRUST_PROXY: '1', VINEXT_TRUSTED_HOSTS: 'cdek-fm.test',
   CDEK_ADMIN_PASSWORD_HASH: 'scrypt$' + salt.toString('hex') + '$' + scryptSync(password, salt, 32,
     { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 }).toString('hex') };
@@ -57,6 +60,15 @@ try {
     await delay(250);
   }
   assert.ok(ready, 'Production server became healthy'); checks++;
+  const proof = await request('/.well-known/support-bridge.json?challenge=http-contract-check');
+  check(proof.status, 200, 'central support bridge proof route');
+  const bridgeIdentity = await proof.json();
+  check(bridgeIdentity.protocol, 'support-websites', 'bridge protocol');
+  check(bridgeIdentity.origin, 'https://cdek-fm.test', 'bridge canonical origin');
+  check((await request('/.well-known/support-bridge.json?challenge=bad')).status, 400, 'invalid bridge challenge');
+  check((await request('/support-api/session')).status, 401, 'anonymous support session');
+  check((await json('/support-api/session', { name: 'Test', externalUserId: 'spoofed' })).status, 400, 'support cannot impersonate an account');
+  check((await json('/support-api/session', { name: 'Test' }, { headers: { origin: 'https://other.test' } })).status, 403, 'support bridge origin guard');
   for (const url of ['/', '/admin', '/api/site-settings', '/api/chat', '/visual/cdek-fm.svg']) check((await request(url)).status, 200, url);
   const landing = await (await request('/')).text();
   const assets = [...landing.matchAll(/(?:src|href)="(\/[^" ]+\.(?:js|css)(?:\?[^" ]*)?)"/g)].map(match => match[1]);
@@ -81,15 +93,32 @@ try {
   check((await json('/api/chat', message)).status, 201, 'new chat message');
   check((await json('/api/chat', message)).status, 200, 'chat retry');
   const imageId = randomUUID();
+  const imageClient = randomUUID();
   const picture = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aLc8AAAAASUVORK5CYII=', 'base64');
   const form = new FormData();
-  form.set('id', imageId); form.set('client', randomUUID()); form.set('body', 'HTTP image');
+  form.set('id', imageId); form.set('client', imageClient); form.set('body', 'HTTP image');
   form.set('image', new File([picture], 'image.png', { type: 'image/png' }));
-  check((await request('/api/chat', { method: 'POST', body: form })).status, 201, 'image upload');
+  const uploaded = await request('/api/chat', { method: 'POST', body: form });
+  check(uploaded.status, 201, 'image upload');
+  check((await uploaded.json()).photoAllowance.remaining, 2, 'remaining photo allowance');
+  const remaining = await request('/api/chat/photo-limit?client=' + imageClient);
+  check(remaining.status, 200, 'photo allowance route');
+  check((await remaining.json()).remaining, 2, 'photo allowance after reload');
+  check((await request('/api/chat/photo-limit?client=invalid')).status, 400, 'invalid photo client');
+  check((await request('/api/chat', { method: 'POST', body: form })).status, 200, 'photo retry');
+  check((await (await request('/api/chat/photo-limit?client=' + imageClient)).json()).remaining, 2, 'photo retry does not consume allowance');
   const image = await request('/api/chat/image/' + imageId);
   check(image.status, 200, 'image read');
   assert.deepEqual(Buffer.from(await image.arrayBuffer()), picture); checks++;
   check((await request('/api/chat/image/' + imageId, { headers: { 'if-none-match': image.headers.get('etag') } })).status, 304, 'image cache');
+  const storageBytes = database().prepare('SELECT bytes FROM local_upload_usage WHERE id = 1').get().bytes;
+  database().prepare('UPDATE local_upload_usage SET bytes = ? WHERE id = 1').run(20 * 1024 ** 3);
+  try {
+    form.set('id', randomUUID()); form.set('client', randomUUID());
+    check((await request('/api/chat', { method: 'POST', body: form })).status, 507, 'full photo storage');
+    check((await json('/api/chat', { id: randomUUID(), client: randomUUID(), body: 'Text with full photo storage' })).status, 201, 'text with full photo storage');
+    check((await request('/api/chat/image/' + imageId)).status, 200, 'existing photo with full storage');
+  } finally { database().prepare('UPDATE local_upload_usage SET bytes = ? WHERE id = 1').run(storageBytes); }
   check((await json('/api/track-requests', { id: randomUUID(), client: randomUUID(), title: 'Test song' })).status, 403, 'closed tracks');
   const ticket = { id: randomUUID(), email: 'listener@example.com', description: 'HTTP support test' };
   check((await json('/api/support/tickets', ticket)).status, 201, 'new ticket');

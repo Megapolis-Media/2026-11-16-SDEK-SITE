@@ -23,6 +23,8 @@ export const editorName = 'Редакция CDEK FM';
 export const messageLimit = 400;
 export const maxImageBytes = 2 * 1024 * 1024;
 export const maxImageEdge = 1600;
+export const dailyPhotoLimit = 3;
+export type PhotoAllowance = { remaining: number; resetsAt: number };
 export const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let temporaryId = '';
 

@@ -47,6 +47,17 @@ export const chatModeration = sqliteTable('chat_moderation', {
   revision: integer('revision').notNull(),
 });
 
+export const chatPhotoDaily = sqliteTable('chat_photo_daily', {
+  authorKey: text('author_key').notNull(),
+  day: integer('day').notNull(),
+  used: integer('used').notNull(),
+}, table => [uniqueIndex('chat_photo_daily_author_day').on(table.authorKey, table.day)]);
+
+export const localUploadUsage = sqliteTable('local_upload_usage', {
+  id: integer('id').primaryKey(),
+  bytes: integer('bytes').notNull(),
+});
+
 export const trackRequest = sqliteTable('track_request', {
   id: text('id').primaryKey(),
   clientKey: text('client_key'),
@@ -80,6 +91,12 @@ export const supportTicket = sqliteTable('support_ticket', {
 export const supportSettings = sqliteTable('support_settings', {
   id: integer('id').primaryKey(),
   email: text('email').notNull(),
+});
+
+export const supportBridgeRate = sqliteTable('support_bridge_rate', {
+  clientKey: text('client_key').primaryKey(),
+  attempts: integer('attempts').notNull(),
+  expiresAt: integer('expires_at').notNull(),
 });
 
 export const supportDelivery = sqliteTable('support_delivery', {

@@ -16,7 +16,7 @@ Production: `cdek-fm.ru`, сервер `194.58.103.93`, Ubuntu 24.04, Docker Com
 
 Серверная сборка сохраняет приложение vinext/React и использует Node.js 24 LTS. Для неё `CDEK_RUNTIME=node` выбирает SQLite и файловое хранилище вместо привязок Cloudflare D1/R2. Изначальный режим Cloudflare остаётся доступен через прежние команды.
 
-Сборка Node создаёт `dist/standalone`; Docker копирует его runtime и запускает `node server.js`, сохраняя отдельно `server/`, `drizzle/` и скрипт миграций. Полный `node_modules` разработчика в конечный образ не копируется. Перед выпуском изменений из аудита 18 ноября нужно проверить Linux Docker build и применить миграцию `0005_track_client_limit.sql` штатным шагом выкладки; локальный аудит production не обновляет.
+Сборка Node создаёт `dist/standalone`; Docker копирует его runtime и запускает `node server.js`, сохраняя отдельно `server/`, `drizzle/` и скрипт миграций. Полный `node_modules` разработчика в конечный образ не копируется. Linux Docker build и запуск с production-ограничениями проверяются в workflow `Verify Linux container` для dev и повторно в production workflow до экспорта образа. Миграции применяются штатным шагом выкладки. Результаты выпуска от 18 ноября, включая `0005_track_client_limit.sql`, описаны в [отчёте аудита](AUDIT-2026-11-18.md).
 
 ```sh
 npm run install:ci
@@ -31,7 +31,9 @@ CDEK_DATA_DIR=./work/local-server-data npm run start:server
 
 - `/srv/cdek-fm/data/cdek.sqlite` — база; файлы WAL/SHM находятся рядом.
 - `/srv/cdek-fm/data/uploads/` — картинки чата.
+- Ограничения фотографий: [20 ГиБ на локальное хранилище и три фото в день](PHOTO-LIMITS.md). Для новой версии нужна миграция `0006_photo_limits.sql`; общий лимит относится к действующему Node/Docker-варианту.
 - `/srv/cdek-fm/runtime.env` — закрытая конфигурация окружения, права `600`.
+- Центральная поддержка: [настройка ключа, проверка домена и регистрация после выпуска](SUPPORT-BRIDGE.md). Для моста нужна миграция `0007_support_bridge.sql`.
 - `/srv/cdek-fm/backups/` — резервные копии перед выкладкой. Их нужно дополнительно копировать за пределы сервера и контролировать свободное место; автоматическое внешнее резервирование пока не настроено.
 - `/srv/cdek-fm/.release` — имя успешно выпущенного образа.
 

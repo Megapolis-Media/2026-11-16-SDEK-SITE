@@ -1,7 +1,8 @@
 'use client';
 
-import { type FormEvent, type RefObject, useRef, useState } from 'react';
+import { type FormEvent, type RefObject, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { supportDescriptionLimit } from '../support-types';
+import type { SupportVisitor, CentralTicket, CentralMessage, CentralMessages } from '../support-bridge-types';
 import { Icon } from './icons';
 import './support.css';
 
@@ -13,48 +14,139 @@ export function SupportButton({ onClick, compact = false }: { onClick: () => voi
 }
 
 export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement | null> }) {
-  const submission = useRef<{ id: string; email: string; description: string } | null>(null);
+  const open = useSyncExternalStore(useCallback(listener => {
+    const dialog = dialogRef.current;
+    if (!dialog) return () => {};
+    const observer = new MutationObserver(listener);
+    observer.observe(dialog, { attributes: true, attributeFilter: ['open'] });
+    return () => observer.disconnect();
+  }, [dialogRef]), useCallback(() => !!dialogRef.current?.open, [dialogRef]), () => false);
+  const submission = useRef<{ key: string; id: string } | null>(null);
+  const sending = useRef<{ key: string; id: string } | null>(null);
+  const mutation = useRef<AbortController | null>(null);
+  const chosen = useRef<number | null>(null);
+  const [visitor, setVisitor] = useState<SupportVisitor | null>();
+  const [tickets, setTickets] = useState<CentralTicket[]>([]);
+  const [older, setOlder] = useState<number | null>(null);
+  const [ticket, setTicket] = useState<CentralTicket | null>(null);
+  const [messages, setMessages] = useState<CentralMessage[]>([]);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
+  const [message, setMessage] = useState('');
+  const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [number, setNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const abort = new AbortController();
+    async function restore() {
+      try {
+        const session = await bridge<{ visitor: SupportVisitor }>('session', undefined, abort.signal);
+        const page = await bridge<TicketPage>('tickets', undefined, abort.signal);
+        if (abort.signal.aborted) return;
+        setVisitor(session.visitor); setName(session.visitor.name);
+        setTickets(page.tickets); setOlder(page.hasMore ? page.nextCursor : null);
+        setTicket(page.tickets.find(item => item.id === chosen.current) ?? page.tickets[0] ?? null);
+        setMessages([]); setError('');
+      } catch (reason) {
+        if (abort.signal.aborted) return;
+        if (reason instanceof SupportError && reason.code === 'SESSION_INVALID') {
+          setVisitor(null); setTicket(null); setTickets([]); setMessages([]); setError('');
+        } else setError(reason instanceof Error ? reason.message : 'Не удалось открыть поддержку.');
+      }
+    }
+    void restore();
+    return () => { abort.abort(); mutation.current?.abort(); };
+  }, [open, reload]);
+
+  const ticketId = ticket?.id;
+  useEffect(() => {
+    if (!open || !ticketId) return;
+    const abort = new AbortController();
+    let cursor = 0;
+    let failures = 0;
+    let pending = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function update() {
+      clearTimeout(timer);
+      if (pending || abort.signal.aborted) return;
+      if (document.hidden) { timer = setTimeout(update, 30_000); return; }
+      pending = true;
+      let delay = 5000;
+      try {
+        let page: CentralMessages;
+        do {
+          page = await bridge<CentralMessages>(`tickets/${ticketId}/messages?after=${cursor}`, undefined, abort.signal);
+          if (abort.signal.aborted) return;
+          if (page.hasMore && page.nextCursor <= cursor) throw new Error('Не удалось загрузить следующую страницу переписки.');
+          cursor = page.nextCursor;
+          setMessages(previous => mergeMessages(previous, page.messages));
+          setTicket(previous => previous?.id === ticketId ? page.ticket : previous);
+        } while (page.hasMore);
+        failures = 0;
+        setError('');
+      } catch (reason) {
+        if (abort.signal.aborted) return;
+        delay = reason instanceof SupportError && reason.status === 429 ? 60_000 : Math.min(60_000, 5000 * 2 ** ++failures);
+        setError(reason instanceof Error ? reason.message : 'Связь с поддержкой прервалась.');
+      } finally {
+        pending = false;
+        if (!abort.signal.aborted) timer = setTimeout(update, delay);
+      }
+    }
+    void update();
+    document.addEventListener('visibilitychange', update);
+    return () => { abort.abort(); clearTimeout(timer); document.removeEventListener('visibilitychange', update); };
+  }, [open, ticketId]);
+
+  async function perform(action: (signal: AbortSignal) => Promise<void>) {
+    if (busy) return;
+    const abort = new AbortController();
+    mutation.current = abort;
+    setBusy(true); setError('');
+    try { await action(abort.signal); }
+    catch (reason) { if (!abort.signal.aborted) setError(reason instanceof Error ? reason.message : 'Не удалось выполнить запрос.'); }
+    finally { if (mutation.current === abort) { mutation.current = null; setBusy(false); } }
+  }
 
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !description.trim()) return;
-    setBusy(true);
-    setError('');
-    try {
-      const address = email.trim();
-      const issue = description.trim();
-      if (submission.current?.email !== address || submission.current.description !== issue) {
-        submission.current = { id: crypto.randomUUID(), email: address, description: issue };
-      }
-      const response = await fetch('/api/support/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submission.current),
-      });
-      const result = await response.json() as { number?: number; error?: string };
-      if (!response.ok || typeof result.number !== 'number') {
-        if (response.status === 409) submission.current = null;
-        setError(result.error || 'Не удалось отправить заявку. Попробуйте ещё раз.');
-        return;
-      }
+    if (!description.trim() || !name.trim()) return;
+    await perform(async signal => {
+      const session = await bridge<{ visitor: SupportVisitor }>('session', { name: name.trim() }, signal);
+      const body = description.trim() + (email.trim() ? '\n\nEmail для связи: ' + email.trim() : '');
+      if (submission.current?.key !== body) submission.current = { key: body, id: crypto.randomUUID() };
+      const result = await bridge<{ ticket: CentralTicket; messages: CentralMessage[] }>('tickets',
+        { subject: 'Обращение с сайта CDEK FM', body, clientRequestId: submission.current.id,
+          ...(email.trim() ? { contactEmail: email.trim() } : {}) }, signal);
+      if (signal.aborted) return;
+      setVisitor(session.visitor);
+      setTickets(previous => [result.ticket, ...previous.filter(item => item.id !== result.ticket.id)]);
+      chosen.current = result.ticket.id; setTicket(result.ticket); setMessages(result.messages);
       submission.current = null;
-      setEmail('');
       setDescription('');
-      setNumber(result.number);
-    } catch {
-      setError('Не удалось отправить заявку. Попробуйте ещё раз.');
-    } finally {
-      setBusy(false);
-    }
+    });
+  }
+
+  function reply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!ticket || !message.trim()) return;
+    const current = ticket;
+    const body = message.trim();
+    const key = current.id + ':' + body;
+    if (sending.current?.key !== key) sending.current = { key, id: crypto.randomUUID() };
+    const clientMessageId = sending.current.id;
+    void perform(async signal => {
+      const result = await bridge<{ message: CentralMessage }>(`tickets/${current.id}/messages`, { body, clientMessageId }, signal);
+      if (signal.aborted) return;
+      setMessages(previous => mergeMessages(previous, [result.message])); setMessage(''); sending.current = null;
+    });
   }
 
   return <dialog ref={dialogRef} id="technical-support" className="site-support-dialog" aria-labelledby="support-title"
-    onClose={() => setNumber(null)}>
+    onClose={() => { mutation.current?.abort(); }}>
     <header className="site-support-heading">
       <span className="site-support-mark"><Icon name="support" size={22} /></span>
       <h2 id="support-title">Техническая поддержка</h2>
@@ -62,22 +154,66 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
         <Icon name="close" size={21} />
       </button>
     </header>
-    {number === null ? <form className="site-support-form" onSubmit={event => void send(event)}>
-      <label>Email для ответа
-        <input type="email" name="email" autoComplete="email" maxLength={254} required value={email} readOnly={busy}
+    {error && <p className="site-support-error" role="alert">{error} <button type="button" onClick={() => setReload(value => value + 1)} disabled={busy}>Повторить загрузку</button></p>}
+    {visitor === undefined ? <p role="status">{error ? 'Поддержка временно недоступна.' : 'Открываем поддержку…'}</p> : <>
+    {!!tickets.length && <div className="site-support-form">
+      <label>Ваши обращения<select aria-label="Ваши обращения" value={ticket?.id ?? ''} disabled={busy} onChange={event => {
+        const selected = tickets.find(item => item.id === Number(event.target.value)) ?? null;
+        chosen.current = selected?.id ?? null; setTicket(selected); setMessages([]); setMessage(''); setError('');
+      }}><option value="">Новое обращение</option>{tickets.map(item => <option key={item.id} value={item.id}>{item.ticketId}: {item.subject}</option>)}</select></label>
+      {older !== null && <button type="button" disabled={busy} onClick={() => void perform(async signal => {
+        const page = await bridge<TicketPage>('tickets?before=' + older, undefined, signal);
+        if (!signal.aborted) { setTickets(previous => [...previous, ...page.tickets.filter(item => !previous.some(old => old.id === item.id))]); setOlder(page.hasMore ? page.nextCursor : null); }
+      })}>Показать прежние обращения</button>}
+    </div>}
+    {!ticket ? <form className="site-support-form" onSubmit={event => void send(event)}>
+      <label>Ваше имя<input name="name" autoComplete="name" maxLength={120} required value={name} readOnly={busy} onChange={event => setName(event.target.value)} /></label>
+      <label>Email для связи (необязательно)
+        <input type="email" name="email" autoComplete="email" maxLength={254} value={email} readOnly={busy}
           onChange={event => setEmail(event.currentTarget.value)} />
       </label>
       <label>С чем нужна помощь
         <textarea name="description" rows={5} maxLength={supportDescriptionLimit} required value={description}
           readOnly={busy} onChange={event => setDescription(event.currentTarget.value)} />
       </label>
-      {error && <p className="site-support-error" role="alert">{error}</p>}
-      <button className="site-support-submit" type="submit" disabled={busy || !description.trim()}>
+      <button className="site-support-submit" type="submit" disabled={busy || !description.trim() || !name.trim()}>
         {busy ? 'Отправляем…' : 'Отправить заявку'}
       </button>
-    </form> : <div className="site-support-form" role="status">
-      <p className="site-support-success"><Icon name="check" size={19} />Заявка №{number} принята</p>
-      <button className="site-support-submit" type="button" onClick={() => dialogRef.current?.close()}>Готово</button>
+      <p>Ответ поддержки появится в этом окне. Переписка доступна в текущем браузерном сеансе.</p>
+    </form> : <div className="site-support-form">
+      <p className="site-support-success" role="status">{ticket.ticketId} · {ticket.status === 'CLOSED' ? 'Закрыто' : ticket.status === 'IN_PROGRESS' ? 'В работе' : 'Новое'}</p>
+      <ol className="site-support-messages" aria-label="Переписка" aria-live="polite" aria-relevant="additions text">
+        {messages.map(item => <li key={item.id}><strong>{item.authorName}</strong><p>{item.body}</p><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('ru-RU')}</time></li>)}
+      </ol>
+      {ticket.status !== 'CLOSED' ? <form className="site-support-form" onSubmit={reply}>
+        <label>Сообщение поддержке<textarea rows={3} maxLength={4000} value={message} required readOnly={busy} onChange={event => setMessage(event.target.value)} /></label>
+        <button className="site-support-submit" disabled={busy || !message.trim()}>{busy ? 'Отправляем…' : 'Отправить сообщение'}</button>
+      </form> : <p>Переписка сохранена. При необходимости создайте новое обращение.</p>}
     </div>}
+    {visitor && <div className="site-support-form">
+      <button type="button" disabled={busy} onClick={() => void perform(async signal => {
+        await bridge('session/logout', {}, signal);
+        if (!signal.aborted) { setVisitor(null); setTickets([]); setTicket(null); setMessages([]); chosen.current = null; }
+      })}>Выйти из переписки на этом устройстве</button>
+    </div>}
+    </>}
   </dialog>;
+}
+
+type TicketPage = { tickets: CentralTicket[]; hasMore: boolean; nextCursor: number | null };
+class SupportError extends Error {
+  constructor(message: string, public status: number, public code?: string) { super(message); }
+}
+async function bridge<T>(path: string, body?: object, signal?: AbortSignal): Promise<T> {
+  const response = await fetch('/support-api/' + path, { method: body === undefined ? 'GET' : 'POST',
+    cache: 'no-store', credentials: 'same-origin', signal,
+    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) });
+  const result = await response.json() as { error?: string; code?: string };
+  if (!response.ok) throw new SupportError(result.error || 'Не удалось связаться с поддержкой.', response.status, result.code);
+  return result as T;
+}
+function mergeMessages(previous: CentralMessage[], next: CentralMessage[]) {
+  const items = new Map(previous.map(item => [item.id, item]));
+  next.forEach(item => items.set(item.id, item));
+  return [...items.values()].sort((a, b) => a.id - b.id);
 }

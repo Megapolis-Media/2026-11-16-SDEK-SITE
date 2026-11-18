@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { randomUUID, scryptSync } from 'node:crypto';
 import path from 'node:path';
-import { database, migrate, localDB } from '../server/storage.mjs';
+import { database, migrate, localDB, localBucket, createLocalBucket } from '../server/storage.mjs';
 import { env, withRequest } from './server-fixture.mjs';
 import * as session from '../app/api/admin/session/route.ts';
 import * as settings from '../app/api/admin/settings/route.ts';
 import * as chat from '../app/api/chat/route.ts';
+import * as photoLimit from '../app/api/chat/photo-limit/route.ts';
 import * as images from '../app/api/chat/image/[id]/route.ts';
 import * as publicSettings from '../app/api/site-settings/route.ts';
 import * as moderation from '../app/api/admin/chat/route.ts';
@@ -48,8 +49,9 @@ before(() => {
   env.CDEK_SUPPORT_API_TOKEN = token;
 });
 beforeEach(async () => {
+  env.BUCKET = localBucket;
   for (const key of ['CDEK_SUPPORT_EMAIL_FROM', 'CDEK_SUPPORT_RESEND_KEY', 'CDEK_SUPPORT_HELPDESK_URL', 'CDEK_SUPPORT_HELPDESK_TOKEN']) delete env[key];
-  for (const name of ['support_delivery', 'support_ticket', 'support_settings', 'chat_message',
+  for (const name of ['support_delivery', 'support_ticket', 'support_settings', 'chat_message', 'chat_photo_daily',
     'chat_moderation', 'track_request', 'studio_session', 'studio_login_attempt', 'site_studio']) database().exec('DELETE FROM ' + name);
   const login = await call(session.POST, '/api/admin/session', 'POST', new URLSearchParams({ action: 'login', username: 'megapolis', password }).toString(),
     { 'content-type': 'application/x-www-form-urlencoded' });
@@ -58,6 +60,81 @@ beforeEach(async () => {
   assert.ok(adminCookie);
 });
 after(() => database().close());
+
+const photoBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aLc8AAAAASUVORK5CYII=', 'base64');
+function uploadPhoto(client, id = randomUUID()) {
+  const form = new FormData();
+  form.set('id', id); form.set('client', client); form.set('body', 'Photo quota test');
+  form.set('image', new File([photoBytes], 'photo.png', { type: 'image/png' }));
+  return withRequest(new Request('https://cdek-fm.test/api/chat', { method: 'POST', body: form,
+    headers: { origin: 'https://cdek-fm.test', 'cf-connecting-ip': '192.0.2.20' } }), chat.POST);
+}
+
+test('three daily photos are enforced across deletion and retries, while text remains available', async () => {
+  const client = randomUUID();
+  const ids = [randomUUID(), randomUUID(), randomUUID()];
+  for (let i = 0; i < 3; i++) {
+    const response = await uploadPhoto(client, ids[i]);
+    assert.equal(response.status, 201);
+    assert.equal((await response.json()).photoAllowance.remaining, 2 - i);
+    database().prepare('UPDATE chat_message SET created_at = ?').run(Date.now() - 5000);
+  }
+  const retry = await uploadPhoto(client, ids[2]);
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).photoAllowance.remaining, 0);
+  const refused = await uploadPhoto(client);
+  assert.equal(refused.status, 429);
+  assert.match((await refused.json()).error, /3 фотографии/);
+  assert.equal((await call(moderation.DELETE, '/api/admin/chat', 'DELETE', { ids: [ids[0]] }, authenticated())).status, 200);
+  const allowance = await call(photoLimit.GET, '/api/chat/photo-limit?client=' + client);
+  assert.equal(allowance.status, 200);
+  assert.equal((await allowance.json()).remaining, 0);
+  assert.equal((await uploadPhoto(client)).status, 429);
+  assert.equal((await call(chat.POST, '/api/chat', 'POST', { id: randomUUID(), client, body: 'Text after 3 photos' })).status, 201);
+  assert.equal((await uploadPhoto(randomUUID())).status, 201);
+});
+
+test('daily photo allowance resets at midnight Moscow, not 24 hours after a visitor first uploaded', async t => {
+  let now = Date.UTC(2026, 10, 17, 20, 59, 45);
+  t.mock.method(Date, 'now', () => now);
+  const client = randomUUID();
+  for (let i = 0; i < 3; i++) {
+    assert.equal((await uploadPhoto(client)).status, 201);
+    now += 2000;
+  }
+  const before = await (await call(photoLimit.GET, '/api/chat/photo-limit?client=' + client)).json();
+  assert.equal(before.remaining, 0);
+  assert.equal(before.resetsAt, Date.UTC(2026, 10, 17, 21));
+  now = before.resetsAt;
+  assert.equal((await (await call(photoLimit.GET, '/api/chat/photo-limit?client=' + client)).json()).remaining, 3);
+  const posted = await uploadPhoto(client);
+  assert.equal(posted.status, 201);
+  assert.equal((await posted.json()).photoAllowance.remaining, 2);
+});
+
+test('full photo storage rejects uploads without consuming daily allowance or preventing text', async () => {
+  const client = randomUUID();
+  env.BUCKET = createLocalBucket({ quotaBytes: 0, minimumFreeBytes: 0 });
+  const refused = await uploadPhoto(client);
+  assert.equal(refused.status, 507);
+  assert.match((await refused.json()).error, /Хранилище фотографий заполнено/);
+  assert.equal((await (await call(photoLimit.GET, '/api/chat/photo-limit?client=' + client)).json()).remaining, 3);
+  assert.equal(database().prepare('SELECT COUNT(*) AS count FROM chat_message').get().count, 0);
+  assert.equal((await call(chat.GET, '/api/chat')).status, 200);
+  assert.equal((await call(chat.POST, '/api/chat', 'POST', { id: randomUUID(), client, body: 'Text while photos are full' })).status, 201);
+});
+
+test('parallel photo requests cannot overrun the last daily slot', async () => {
+  const client = randomUUID();
+  for (let i = 0; i < 2; i++) {
+    assert.equal((await uploadPhoto(client)).status, 201);
+    database().prepare('UPDATE chat_message SET created_at = ?').run(Date.now() - 5000);
+  }
+  const results = await Promise.all([uploadPhoto(client), uploadPhoto(client), uploadPhoto(client)]);
+  assert.deepEqual(results.map(result => result.status).sort(), [201, 429, 429]);
+  assert.equal(database().prepare('SELECT COUNT(*) AS count FROM chat_message WHERE image_key IS NOT NULL').get().count, 3);
+  assert.equal((await (await call(photoLimit.GET, '/api/chat/photo-limit?client=' + client)).json()).remaining, 0);
+});
 
 test('admin writes require a session and same origin; logout revokes the token', async () => {
   const forged = await call(settings.PUT, '/api/admin/settings', 'PUT', {},

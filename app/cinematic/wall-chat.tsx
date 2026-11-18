@@ -6,8 +6,8 @@ import {
 } from 'react';
 import NextImage from 'next/image';
 import {
-  chatClient, editorName, getNickname, maxImageBytes, maxImageEdge, messageLimit, saveNickname,
-  type ChatThread, type GreetingMessage,
+  chatClient, dailyPhotoLimit, editorName, getNickname, maxImageBytes, maxImageEdge, messageLimit, saveNickname,
+  type ChatThread, type GreetingMessage, type PhotoAllowance,
 } from '../chat-types';
 import { type GreetingCard, useGreetings } from './greetings';
 import { Icon } from './icons';
@@ -97,6 +97,7 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
   const [busy, setBusy] = useState(false);
   const [packing, setPacking] = useState(false);
   const [notice, setNotice] = useState('');
+  const [photos, setPhotos] = useState<PhotoAllowance | null>(null);
   const nameId = useId();
   const messageId = useId();
   const replyId = useId();
@@ -129,12 +130,22 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
     setNotice('');
     setPreparing(true);
     try {
+      const limitResponse = await fetch('/api/chat/photo-limit?client=' + chatClient(), { cache: 'no-store' });
+      if (!limitResponse.ok) throw new Error('Не удалось проверить лимит фотографий. Попробуйте ещё раз.');
+      const allowance: PhotoAllowance = await limitResponse.json();
+      if (!mounted.current) return;
+      setPhotos(allowance);
+      if (!allowance.remaining) {
+        setNotice('Сегодня вы уже отправили 3 фотографии. Новые фото доступны после 00:00 по Москве. Текстовые сообщения можно отправлять.');
+        return;
+      }
       const prepared = await preparePicture(file);
       if (!mounted.current) return;
       attempt.current = '';
       resetPhoto(prepared);
-    } catch {
-      setNotice(file.size > 24 * 1024 * 1024 ? 'Выберите картинку размером до 24 МБ' : 'Не удалось открыть картинку. Попробуйте JPG, PNG или WebP');
+    } catch (error) {
+      setNotice(error instanceof Error && error.message.startsWith('Не удалось проверить') ? error.message :
+        file.size > 24 * 1024 * 1024 ? 'Выберите картинку размером до 24 МБ' : 'Не удалось открыть картинку. Попробуйте JPG, PNG или WebP');
     } finally { if (mounted.current) setPreparing(false); }
   }
 
@@ -155,7 +166,8 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
     if (picture) fields.set('image', picture);
     try {
       const response = await fetch('/api/chat', { method: 'POST', body: fields });
-      const result = await response.json() as { error?: string };
+      const result = await response.json() as { error?: string; photoAllowance?: PhotoAllowance };
+      if (result.photoAllowance) setPhotos(result.photoAllowance);
       if (!response.ok) throw new Error(result.error ?? 'Связь прервалась. Попробуйте ещё раз');
       const message = result as unknown as GreetingMessage;
       const animate = !admin && air?.motionReady && !air.motionPaused && !document.hidden;
@@ -167,7 +179,10 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
       setBody('');
       resetPhoto(null);
       attempt.current = '';
-      setNotice(target ? 'Ответ опубликован' : 'Сообщение опубликовано');
+      setNotice(result.photoAllowance ? result.photoAllowance.remaining
+        ? 'Фотография отправлена. Сегодня можно отправить ещё ' + result.photoAllowance.remaining + '.'
+        : 'Фотография отправлена. Сегодняшний лимит из 3 фотографий использован. Новые фото доступны после 00:00 по Москве.'
+        : target ? 'Ответ опубликован' : 'Сообщение опубликовано');
       if (panel?.current && wasFocused) document.querySelector<HTMLAnchorElement>('.air-greeting')?.focus({ preventScroll: true });
       sent?.();
     } catch (error) {
@@ -219,7 +234,9 @@ function Composer({ editorial = false, admin = false, circuit = false, panel, ta
         {simple && <span>{busy ? 'Отправляем…' : 'Отправить'}</span>}
       </button>
     </div>
-    {(preparing || notice) && <p className="wall-notice" role="status">{preparing ? 'Готовим картинку…' : notice}</p>}
+    <p className="wall-notice">До {dailyPhotoLimit} фотографий в день. Новый день — в 00:00 по Москве.
+      {photos && photos.remaining > 0 && <> Сегодня доступно: {photos.remaining}.</>}</p>
+    {(preparing || notice) && <p className="wall-notice" role="status">{preparing ? 'Проверяем и готовим картинку…' : notice}</p>}
   </form>;
 }
 
