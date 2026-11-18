@@ -43,6 +43,13 @@
       "when": 1794952506674,
       "tag": "0005_track_client_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794989986325,
+      "tag": "0006_photo_limits",
+      "breakpoints": true
     }
   ]
 }

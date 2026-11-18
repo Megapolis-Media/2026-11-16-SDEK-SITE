@@ -81,15 +81,32 @@ try {
   check((await json('/api/chat', message)).status, 201, 'new chat message');
   check((await json('/api/chat', message)).status, 200, 'chat retry');
   const imageId = randomUUID();
+  const imageClient = randomUUID();
   const picture = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aLc8AAAAASUVORK5CYII=', 'base64');
   const form = new FormData();
-  form.set('id', imageId); form.set('client', randomUUID()); form.set('body', 'HTTP image');
+  form.set('id', imageId); form.set('client', imageClient); form.set('body', 'HTTP image');
   form.set('image', new File([picture], 'image.png', { type: 'image/png' }));
-  check((await request('/api/chat', { method: 'POST', body: form })).status, 201, 'image upload');
+  const uploaded = await request('/api/chat', { method: 'POST', body: form });
+  check(uploaded.status, 201, 'image upload');
+  check((await uploaded.json()).photoAllowance.remaining, 2, 'remaining photo allowance');
+  const remaining = await request('/api/chat/photo-limit?client=' + imageClient);
+  check(remaining.status, 200, 'photo allowance route');
+  check((await remaining.json()).remaining, 2, 'photo allowance after reload');
+  check((await request('/api/chat/photo-limit?client=invalid')).status, 400, 'invalid photo client');
+  check((await request('/api/chat', { method: 'POST', body: form })).status, 200, 'photo retry');
+  check((await (await request('/api/chat/photo-limit?client=' + imageClient)).json()).remaining, 2, 'photo retry does not consume allowance');
   const image = await request('/api/chat/image/' + imageId);
   check(image.status, 200, 'image read');
   assert.deepEqual(Buffer.from(await image.arrayBuffer()), picture); checks++;
   check((await request('/api/chat/image/' + imageId, { headers: { 'if-none-match': image.headers.get('etag') } })).status, 304, 'image cache');
+  const storageBytes = database().prepare('SELECT bytes FROM local_upload_usage WHERE id = 1').get().bytes;
+  database().prepare('UPDATE local_upload_usage SET bytes = ? WHERE id = 1').run(20 * 1024 ** 3);
+  try {
+    form.set('id', randomUUID()); form.set('client', randomUUID());
+    check((await request('/api/chat', { method: 'POST', body: form })).status, 507, 'full photo storage');
+    check((await json('/api/chat', { id: randomUUID(), client: randomUUID(), body: 'Text with full photo storage' })).status, 201, 'text with full photo storage');
+    check((await request('/api/chat/image/' + imageId)).status, 200, 'existing photo with full storage');
+  } finally { database().prepare('UPDATE local_upload_usage SET bytes = ? WHERE id = 1').run(storageBytes); }
   check((await json('/api/track-requests', { id: randomUUID(), client: randomUUID(), title: 'Test song' })).status, 403, 'closed tracks');
   const ticket = { id: randomUUID(), email: 'listener@example.com', description: 'HTTP support test' };
   check((await json('/api/support/tickets', ticket)).status, 201, 'new ticket');

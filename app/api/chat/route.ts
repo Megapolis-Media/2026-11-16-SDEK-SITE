@@ -3,6 +3,7 @@ import { maxImageBytes, messageLimit, uuid } from '../../chat-types';
 import { chatModerationRevision, cleanText, hash, inspectImage, listMessages, mediaType, messageById, presentMessage, readBytes, visitor } from '../../server/chat';
 import { json, publicEdition, readStudio, sameOrigin } from '../../server/studio';
 import { withApiErrors } from '../../server/api-errors';
+import { photoAllowance, photoDailyError } from '../../server/photo-limits';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,9 +82,17 @@ async function postChat(request: Request) {
 
   const matching = () => db.prepare('SELECT id FROM chat_message WHERE id = ? AND author_key = ? AND body = ? AND parent_id IS ? AND image_digest IS ?')
     .bind(id, author.id, body, parentId, digest).first();
-  if (await matching()) {
+  const savedResponse = async (status: number) => {
     const message = await messageById(id);
-    if (message) return json(presentMessage(message));
+    return message ? json({ ...presentMessage(message),
+      ...(file ? { photoAllowance: await photoAllowance(author.id) } : {}) }, status) : json({}, 503);
+  };
+  if (await matching()) {
+    return savedResponse(200);
+  }
+  if (file) {
+    const allowance = await photoAllowance(author.id);
+    if (!allowance.remaining) return json({ error: photoDailyError, photoAllowance: allowance }, 429);
   }
   const now = Date.now();
   const permitted = await db.prepare(`SELECT 1 WHERE NOT EXISTS (
@@ -106,6 +115,14 @@ async function postChat(request: Request) {
       .bind(id, author.fingerprint, body, now, author.id, author.name, Number(author.editorial), parentId, thread, imageKey,
         details?.type ?? null, digest, details?.width ?? null, details?.height ?? null, now - 1200, now - 60_000).first();
   } catch (error) {
+    if (error instanceof Error && error.message.includes('CDEK_PHOTO_DAILY_LIMIT')) {
+      if (await matching()) return savedResponse(200);
+      return json({ error: photoDailyError, photoAllowance: await photoAllowance(author.id) }, 429);
+    }
+    if (error && typeof error === 'object' && 'code' in error &&
+      ['CDEK_PHOTO_STORAGE_FULL', 'ENOSPC', 'EDQUOT'].includes(String(error.code))) {
+      return json({ error: 'Хранилище фотографий заполнено. Загрузка фото временно недоступна. Можно отправить текстовое сообщение.' }, 507);
+    }
     console.error('Chat delivery failed', error);
     return json({ error: 'Связь прервалась. Попробуйте отправить снова' }, 503);
   } finally {
@@ -121,8 +138,7 @@ async function postChat(request: Request) {
     if (parentId && !await messageById(parentId)) return json({ error: 'Сообщение не найдено' }, 404);
     return json({ error: 'Подождите немного и отправьте снова' }, 429);
   }
-  const message = await messageById(id);
-  return message ? json(presentMessage(message), inserted ? 201 : 200) : json({}, 503);
+  return savedResponse(inserted ? 201 : 200);
 }
 
 export const GET = withApiErrors(readChat, 'Чат временно недоступен. Попробуйте ещё раз.');
