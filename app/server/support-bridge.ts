@@ -73,8 +73,8 @@ async function upstream(path: string, method = 'GET', body?: object, token?: str
   return data;
 }
 
-function setCookie(response: Response, token: string, age = 31_536_000) {
-  response.headers.set('set-cookie', `${cookieName}=${token}; Max-Age=${age}; Path=/; Secure; HttpOnly; SameSite=Lax`);
+function setCookie(response: Response, token: string, age?: number) {
+  response.headers.set('set-cookie', `${cookieName}=${token};${age === undefined ? '' : ` Max-Age=${age};`} Path=/; Secure; HttpOnly; SameSite=Lax`);
   return response;
 }
 
@@ -173,7 +173,8 @@ export async function handleBridge(request: Request, path: string[]) {
       return json(result);
     }
     if (action === 'tickets' && !get) {
-      const input = z.object({ subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(12_000), clientRequestId: uuid }).strict().parse(body);
+      const input = z.object({ subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(12_000), clientRequestId: uuid,
+        contactEmail: z.string().trim().email().max(254).optional() }).strict().parse(body);
       const result = received(z.object({ ticket: ticketSchema, messages: z.array(messageSchema).max(100) }), await upstream('/tickets', 'POST', input, token));
       return json(result, 201);
     }

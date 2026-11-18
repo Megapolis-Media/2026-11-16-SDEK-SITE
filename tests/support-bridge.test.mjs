@@ -75,6 +75,7 @@ test('guest creation puts its credential only in a Secure HttpOnly host cookie',
   const response = await call('session', { name: guest.name }, { cookie: '' });
   assert.equal(response.status, 200);
   assert.match(response.headers.get('set-cookie'), /__Host-cdek-support=.*Secure; HttpOnly; SameSite=Lax/);
+  assert.doesNotMatch(response.headers.get('set-cookie'), /Max-Age|Expires/);
   assert.deepEqual(await response.json(), { visitor: guest });
   assert.equal(requests[0].body.kind, 'guest');
   assert.equal('externalUserId' in requests[0].body, false);
@@ -105,6 +106,12 @@ test('foreign tickets remain inaccessible and invalid message cursors are reject
   assert.equal((await call('tickets/2/messages')).status, 404);
   assert.equal((await call('tickets/1/messages?after=1%26admin=true')).status, 400);
   assert.equal((await call('tickets', { subject: 'Test', body: 'Question', clientRequestId: randomUUID(), visitorId: 2 })).status, 400);
+});
+test('optional visitor email is validated and forwarded for platform-owned receipts', async () => {
+  const response = await call('tickets', { subject: 'Test', body: 'A question', clientRequestId: randomUUID(), contactEmail: 'visitor@example.com' });
+  assert.equal(response.status, 201);
+  assert.equal(requests.find(item => item.url.endsWith('/tickets')).body.contactEmail, 'visitor@example.com');
+  assert.equal((await call('tickets', { subject: 'Test', body: 'Question', clientRequestId: randomUUID(), contactEmail: 'invalid' })).status, 400);
 });
 test('revoked integration keys do not clear an otherwise valid visitor cookie', async () => {
   respond = () => Response.json({ code: 'INTEGRATION_UNAUTHORIZED', error: key }, { status: 401 });

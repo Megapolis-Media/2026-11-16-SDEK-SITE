@@ -34,8 +34,6 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [message, setMessage] = useState('');
-  const [recovery, setRecovery] = useState('');
-  const [recoveryInput, setRecoveryInput] = useState('');
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -121,13 +119,14 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
       const body = description.trim() + (email.trim() ? '\n\nEmail для связи: ' + email.trim() : '');
       if (submission.current?.key !== body) submission.current = { key: body, id: crypto.randomUUID() };
       const result = await bridge<{ ticket: CentralTicket; messages: CentralMessage[] }>('tickets',
-        { subject: 'Обращение с сайта CDEK FM', body, clientRequestId: submission.current.id }, signal);
+        { subject: 'Обращение с сайта CDEK FM', body, clientRequestId: submission.current.id,
+          ...(email.trim() ? { contactEmail: email.trim() } : {}) }, signal);
       if (signal.aborted) return;
       setVisitor(session.visitor);
       setTickets(previous => [result.ticket, ...previous.filter(item => item.id !== result.ticket.id)]);
       chosen.current = result.ticket.id; setTicket(result.ticket); setMessages(result.messages);
       submission.current = null;
-      setDescription(''); setRecovery('');
+      setDescription('');
     });
   }
 
@@ -146,13 +145,8 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
     });
   }
 
-  const recover = () => perform(async signal => {
-    await bridge('session/recover', { recoveryCode: recoveryInput.trim() }, signal);
-    if (!signal.aborted) { setRecoveryInput(''); setReload(value => value + 1); }
-  });
-
   return <dialog ref={dialogRef} id="technical-support" className="site-support-dialog" aria-labelledby="support-title"
-    onClose={() => { mutation.current?.abort(); setRecovery(''); }}>
+    onClose={() => { mutation.current?.abort(); }}>
     <header className="site-support-heading">
       <span className="site-support-mark"><Icon name="support" size={22} /></span>
       <h2 id="support-title">Техническая поддержка</h2>
@@ -174,7 +168,7 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
     </div>}
     {!ticket ? <form className="site-support-form" onSubmit={event => void send(event)}>
       <label>Ваше имя<input name="name" autoComplete="name" maxLength={120} required value={name} readOnly={busy} onChange={event => setName(event.target.value)} /></label>
-      <label>Email для ответа
+      <label>Email для связи (необязательно)
         <input type="email" name="email" autoComplete="email" maxLength={254} value={email} readOnly={busy}
           onChange={event => setEmail(event.currentTarget.value)} />
       </label>
@@ -185,6 +179,7 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
       <button className="site-support-submit" type="submit" disabled={busy || !description.trim() || !name.trim()}>
         {busy ? 'Отправляем…' : 'Отправить заявку'}
       </button>
+      <p>Ответ поддержки появится в этом окне. Переписка доступна в текущем браузерном сеансе.</p>
     </form> : <div className="site-support-form">
       <p className="site-support-success" role="status">{ticket.ticketId} · {ticket.status === 'CLOSED' ? 'Закрыто' : ticket.status === 'IN_PROGRESS' ? 'В работе' : 'Новое'}</p>
       <ol className="site-support-messages" aria-label="Переписка" aria-live="polite" aria-relevant="additions text">
@@ -195,20 +190,12 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
         <button className="site-support-submit" disabled={busy || !message.trim()}>{busy ? 'Отправляем…' : 'Отправить сообщение'}</button>
       </form> : <p>Переписка сохранена. При необходимости создайте новое обращение.</p>}
     </div>}
-    {visitor ? <div className="site-support-form">
-      <button type="button" disabled={busy} onClick={() => void perform(async signal => {
-        const result = await bridge<{ recoveryCode: string }>('session/recovery-code', {}, signal);
-        if (!signal.aborted) setRecovery(result.recoveryCode);
-      })}>Получить код восстановления переписки</button>
-      {recovery && <label>Код даёт доступ к вашим обращениям. Сохраните его в безопасном месте.<textarea readOnly value={recovery} autoComplete="off" spellCheck={false} /></label>}
+    {visitor && <div className="site-support-form">
       <button type="button" disabled={busy} onClick={() => void perform(async signal => {
         await bridge('session/logout', {}, signal);
-        if (!signal.aborted) { setVisitor(null); setTickets([]); setTicket(null); setMessages([]); setRecovery(''); chosen.current = null; }
+        if (!signal.aborted) { setVisitor(null); setTickets([]); setTicket(null); setMessages([]); chosen.current = null; }
       })}>Выйти из переписки на этом устройстве</button>
-    </div> : <form className="site-support-form" onSubmit={event => { event.preventDefault(); void recover(); }}>
-      <label>Код восстановления<input value={recoveryInput} autoComplete="off" maxLength={512} readOnly={busy} onChange={event => setRecoveryInput(event.target.value)} /></label>
-      <button type="submit" disabled={busy || !recoveryInput.trim()}>Восстановить переписку</button>
-    </form>}
+    </div>}
     </>}
   </dialog>;
 }
