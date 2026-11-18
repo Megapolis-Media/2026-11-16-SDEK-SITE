@@ -28,6 +28,7 @@ export async function GET() {
     await env.DB.prepare('SELECT id, bytes FROM local_upload_usage LIMIT 0').all();
     const guards = await env.DB.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name IN ('chat_photo_daily_guard', 'chat_photo_daily_count')").first<number>('count');
     if (guards !== 2) throw new Error('Missing photo quota guards');
+    await env.DB.prepare('SELECT client_key, attempts, expires_at FROM support_bridge_rate LIMIT 0').all();
     return Response.json({ status: 'ok' }, { headers: { 'cache-control': 'no-store' } });
   } catch {
     return Response.json({ status: 'unavailable' }, { status: 503, headers: { 'cache-control': 'no-store' } });

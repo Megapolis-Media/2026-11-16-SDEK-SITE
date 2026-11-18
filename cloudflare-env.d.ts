@@ -9,5 +9,8 @@ declare namespace Cloudflare {
     CDEK_SUPPORT_HELPDESK_TOKEN?: string;
     CDEK_SUPPORT_RESEND_KEY?: string;
     CDEK_SUPPORT_EMAIL_FROM?: string;
+    CDEK_SUPPORT_PLATFORM_URL?: string;
+    CDEK_SUPPORT_PLATFORM_KEY?: string;
+    CDEK_SUPPORT_SITE_ORIGIN?: string;
   }
 }

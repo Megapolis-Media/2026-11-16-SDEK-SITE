@@ -53,7 +53,7 @@
 .site-support-close:hover { background: #29594c; }
 .site-support-form { display: grid; gap: 15px; margin-top: 19px; }
 .site-support-form label { display: grid; gap: 7px; color: #c5ecdf; font-size: 14px; font-weight: 620; }
-.site-support-form :is(input, textarea) {
+.site-support-form :is(input, textarea, select) {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -84,3 +84,6 @@
 .site-support-submit:disabled { opacity: .55; }
 .site-support-error { color: #ffd1aa; font-size: 14px; }
 .site-support-success { display: flex; align-items: center; gap: 8px; color: #aeffdb; font-weight: 660; }
+.site-support-messages { display: grid; gap: 14px; max-height: 38svh; overflow-y: auto; padding: 0; list-style: none; }
+.site-support-messages p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.site-support-messages time { font-size: 12px; color: #a4cabb; }

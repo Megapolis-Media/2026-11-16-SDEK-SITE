@@ -25,6 +25,7 @@ COPY --from=build --chown=node:node /app/dist/standalone ./
 COPY --from=build --chown=node:node /app/server ./server
 COPY --from=build --chown=node:node /app/drizzle ./drizzle
 COPY --from=build --chown=node:node /app/scripts/server.mjs ./scripts/server.mjs
+COPY --from=build --chown=node:node /app/scripts/register-support.mjs ./scripts/register-support.mjs
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000

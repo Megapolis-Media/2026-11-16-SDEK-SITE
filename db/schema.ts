@@ -93,6 +93,12 @@ export const supportSettings = sqliteTable('support_settings', {
   email: text('email').notNull(),
 });
 
+export const supportBridgeRate = sqliteTable('support_bridge_rate', {
+  clientKey: text('client_key').primaryKey(),
+  attempts: integer('attempts').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+});
+
 export const supportDelivery = sqliteTable('support_delivery', {
   ticketId: text('ticket_id').notNull().references(() => supportTicket.id, { onDelete: 'cascade' }),
   channel: text('channel', { enum: ['email', 'helpdesk'] }).notNull(),
