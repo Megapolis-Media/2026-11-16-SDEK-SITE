@@ -66,6 +66,7 @@ async function upstream(path: string, method = 'GET', body?: object, token?: str
     if (value === 'SESSION_INVALID') throw new BridgeError(401, 'Сессия поддержки завершена. Укажите имя или восстановите переписку.', value);
     const status = response.status >= 500 ? 502 : response.status;
     throw new BridgeError(status, status === 429 ? 'Слишком много запросов. Подождите немного.' :
+      status >= 500 ? 'Поддержка временно недоступна. Повторите попытку позже.' :
       status === 404 ? 'Обращение не найдено или недоступно.' : status === 409 ? 'Обращение изменилось или уже закрыто. Обновите переписку.' :
       status === 401 || status === 403 ? 'Нет доступа к обращению.' : 'Не удалось выполнить запрос поддержки. Проверьте данные.');
   }

@@ -119,6 +119,13 @@ test('invalid visitor sessions are distinguished from integration failures and c
   assert.equal(response.status, 401);
   assert.match(response.headers.get('set-cookie'), /Max-Age=0/);
 });
+test('upstream service failures do not tell visitors to change valid form data', async () => {
+  respond = () => Response.json({ error: 'Сайт ещё не подтвердил регламент интеграции' }, { status: 503 });
+  const response = await call('session', { name: 'Guest' }, { cookie: '' });
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).error, 'Поддержка временно недоступна. Повторите попытку позже.');
+  assert.equal(response.headers.get('set-cookie'), null);
+});
 test('oversized, malformed and internal upstream data never reach the browser', async () => {
   respond = () => new Response('x'.repeat(1024 * 1024 + 1));
   assert.equal((await call('session')).status, 502);
