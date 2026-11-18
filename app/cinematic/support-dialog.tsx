@@ -37,6 +37,8 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const messageList = useRef<HTMLOListElement>(null);
+  const followMessages = useRef(true);
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +64,11 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
   }, [open, reload]);
 
   const ticketId = ticket?.id;
+  useEffect(() => { followMessages.current = true; }, [open, ticketId]);
+  useEffect(() => {
+    const list = messageList.current;
+    if (open && list && followMessages.current) list.scrollTop = list.scrollHeight;
+  }, [messages, open]);
   useEffect(() => {
     if (!open || !ticketId) return;
     const abort = new AbortController();
@@ -141,6 +148,7 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
     void perform(async signal => {
       const result = await bridge<{ message: CentralMessage }>(`tickets/${current.id}/messages`, { body, clientMessageId }, signal);
       if (signal.aborted) return;
+      followMessages.current = true;
       setMessages(previous => mergeMessages(previous, [result.message])); setMessage(''); sending.current = null;
     });
   }
@@ -149,14 +157,15 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
     onClose={() => { mutation.current?.abort(); }}>
     <header className="site-support-heading">
       <span className="site-support-mark"><Icon name="support" size={22} /></span>
-      <h2 id="support-title">Техническая поддержка</h2>
+      <div><h2 id="support-title">Техническая поддержка</h2><p>Команда CDEK FM</p></div>
       <button type="button" className="site-support-close" aria-label="Закрыть" onClick={() => dialogRef.current?.close()}>
         <Icon name="close" size={21} />
       </button>
     </header>
     {error && <p className="site-support-error" role="alert">{error} <button type="button" onClick={() => setReload(value => value + 1)} disabled={busy}>Повторить загрузку</button></p>}
-    {visitor === undefined ? <p role="status">{error ? 'Поддержка временно недоступна.' : 'Открываем поддержку…'}</p> : <>
-    {!!tickets.length && <div className="site-support-form">
+    <div className="site-support-content">
+    {visitor === undefined ? <p className="site-support-loading" role="status">{error ? 'Поддержка временно недоступна.' : 'Открываем поддержку…'}</p> : <>
+    {!!tickets.length && <div className="site-support-form site-support-switcher">
       <label>Ваши обращения<select aria-label="Ваши обращения" value={ticket?.id ?? ''} disabled={busy} onChange={event => {
         const selected = tickets.find(item => item.id === Number(event.target.value)) ?? null;
         chosen.current = selected?.id ?? null; setTicket(selected); setMessages([]); setMessage(''); setError('');
@@ -166,7 +175,7 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
         if (!signal.aborted) { setTickets(previous => [...previous, ...page.tickets.filter(item => !previous.some(old => old.id === item.id))]); setOlder(page.hasMore ? page.nextCursor : null); }
       })}>Показать прежние обращения</button>}
     </div>}
-    {!ticket ? <form className="site-support-form" onSubmit={event => void send(event)}>
+    {!ticket ? <form className="site-support-form site-support-intake" onSubmit={event => void send(event)}>
       <label>Ваше имя<input name="name" autoComplete="name" maxLength={120} required value={name} readOnly={busy} onChange={event => setName(event.target.value)} /></label>
       <label>Email для связи (необязательно)
         <input type="email" name="email" autoComplete="email" maxLength={254} value={email} readOnly={busy}
@@ -180,23 +189,43 @@ export function SupportDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogEl
         {busy ? 'Отправляем…' : 'Отправить заявку'}
       </button>
       <p>Ответ поддержки появится в этом окне. Переписка доступна в текущем браузерном сеансе.</p>
-    </form> : <div className="site-support-form">
-      <p className="site-support-success" role="status">{ticket.ticketId} · {ticket.status === 'CLOSED' ? 'Закрыто' : ticket.status === 'IN_PROGRESS' ? 'В работе' : 'Новое'}</p>
-      <ol className="site-support-messages" aria-label="Переписка" aria-live="polite" aria-relevant="additions text">
-        {messages.map(item => <li key={item.id}><strong>{item.authorName}</strong><p>{item.body}</p><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString('ru-RU')}</time></li>)}
+    </form> : <div className="site-support-conversation">
+      <div className="site-support-conversation-heading">
+        <span>{ticket.ticketId}</span>
+        <span className="site-support-ticket-status" data-status={ticket.status} role="status">
+          {ticket.status === 'CLOSED' ? 'Закрыто' : ticket.status === 'IN_PROGRESS' ? 'В работе' : 'Новое обращение'}
+        </span>
+      </div>
+      <ol ref={messageList} className="site-support-messages" aria-label="Переписка" aria-live="polite" aria-relevant="additions text"
+        onScroll={event => {
+          const list = event.currentTarget;
+          followMessages.current = list.scrollHeight - list.scrollTop - list.clientHeight < 72;
+        }}>
+        {messages.map(item => <li className="site-support-message" data-own={item.authorType === 'visitor'} key={item.id}>
+          <strong>{item.authorType === 'visitor' ? 'Вы' : item.authorName}</strong>
+          <p>{item.body}</p>
+          <time dateTime={item.createdAt} title={new Date(item.createdAt).toLocaleString('ru-RU')}>
+            {new Date(item.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+          </time>
+        </li>)}
       </ol>
-      {ticket.status !== 'CLOSED' ? <form className="site-support-form" onSubmit={reply}>
-        <label>Сообщение поддержке<textarea rows={3} maxLength={4000} value={message} required readOnly={busy} onChange={event => setMessage(event.target.value)} /></label>
-        <button className="site-support-submit" disabled={busy || !message.trim()}>{busy ? 'Отправляем…' : 'Отправить сообщение'}</button>
-      </form> : <p>Переписка сохранена. При необходимости создайте новое обращение.</p>}
-    </div>}
-    {visitor && <div className="site-support-form">
-      <button type="button" disabled={busy} onClick={() => void perform(async signal => {
-        await bridge('session/logout', {}, signal);
-        if (!signal.aborted) { setVisitor(null); setTickets([]); setTicket(null); setMessages([]); chosen.current = null; }
-      })}>Выйти из переписки на этом устройстве</button>
+      {ticket.status !== 'CLOSED' ? <form className="site-support-form site-support-composer" onSubmit={reply}>
+        <label><span>Сообщение поддержке</span><textarea rows={2} maxLength={4000} value={message} required readOnly={busy}
+          placeholder="Напишите сообщение…" onChange={event => setMessage(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              if (!busy && message.trim()) event.currentTarget.form?.requestSubmit();
+            }
+          }} /></label>
+        <button className="site-support-submit" disabled={busy || !message.trim()} aria-label={busy ? 'Отправляем сообщение' : 'Отправить сообщение'}>
+          <Icon name="send" size={21} />
+        </button>
+        <span className="site-support-composer-hint">{busy ? 'Отправляем…' : 'Enter — отправить · Shift + Enter — новая строка'}</span>
+      </form> : <p className="site-support-closed">Обращение закрыто. Переписка сохранена — вы можете создать новое обращение.</p>}
     </div>}
     </>}
+    </div>
   </dialog>;
 }
 
